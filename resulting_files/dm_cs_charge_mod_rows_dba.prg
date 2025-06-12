@@ -1,0 +1,275 @@
+CREATE PROGRAM dm_cs_charge_mod_rows:dba
+ DECLARE dm_cs_charge_mod_rows = vc WITH private, noconstant("691220.FT.004")
+ DECLARE sbr_fetch_starting_id(null) = f8
+ DECLARE sbr_delete_starting_id(null) = null
+ SUBROUTINE (output_plan(i_statement_id=vc,i_file=vc,i_debug_str=vc) =null)
+   CALL echo(i_file)
+   SELECT INTO value(i_file)
+    x = substring(1,100,i_debug_str)
+    FROM dual
+    DETAIL
+     x
+    WITH maxcol = 130
+   ;end select
+   FOR (i = 2 TO ceil((size(i_debug_str)/ 100.0)))
+     SELECT INTO value(i_file)
+      x = substring((1+ ((i - 1) * 100)),100,i_debug_str)
+      FROM dual
+      DETAIL
+       x
+      WITH maxcol = 130, append
+     ;end select
+   ENDFOR
+   SELECT INTO value(i_file)
+    x = fillstring(100,"=")
+    FROM dual
+    DETAIL
+     x
+    WITH maxcol = 130, append
+   ;end select
+   SELECT INTO value(i_file)
+    dm_ind = nullind(dm.index_name), p.statement_id, p.id,
+    p.parent_id, p.position, p.operation,
+    p.options, p.object_name, dm.table_name,
+    dm.index_name, dm.column_position, dm.uniqueness,
+    colname = substring(1,30,dm.column_name)
+    FROM plan_table p,
+     dm_user_ind_columns dm
+    PLAN (p
+     WHERE p.statement_id=patstring(i_statement_id))
+     JOIN (dm
+     WHERE (dm.index_name= Outerjoin(p.object_name)) )
+    ORDER BY p.statement_id, p.id, dm.index_name,
+     dm.column_position
+    HEAD REPORT
+     indent = 0, line = fillstring(100,"=")
+    HEAD p.statement_id
+     "PLAN STATEMENT FOR ", p.statement_id, row + 1,
+     line, row + 1, indent = 0
+    HEAD p.id
+     indent += 1, col 0, p.id"#####",
+     col + 1, col + indent, indent"###",
+     ")", p.operation, col + 1,
+     p.options, col + 1, p.object_name,
+     col + 1
+    DETAIL
+     IF (dm_ind=0)
+      IF (dm.column_position=1)
+       row + 1, col + (indent+ 10), ">>>",
+       col + 1, dm.uniqueness, col + 1
+      ELSE
+       ","
+      ENDIF
+      CALL print(trim(colname))
+     ENDIF
+    FOOT  p.id
+     row + 1
+    WITH nocounter, maxrow = 1, noformfeed,
+     maxcol = 400, append
+   ;end select
+ END ;Subroutine
+ SUBROUTINE sbr_fetch_starting_id(null)
+   DECLARE sbr_startingid = f8 WITH protect, noconstant(1.0)
+   DECLARE sbr_infoname = vc WITH protect, noconstant("")
+   IF (batch_ndx=1)
+    RETURN(1.0)
+   ENDIF
+   SET sbr_infoname = concat(trim(cnvtstring(jobs->data[job_ndx].template_nbr),3)," - ",trim(
+     cnvtstring(v_log_id),3))
+   SELECT INTO "nl:"
+    FROM dm_info di
+    WHERE di.info_domain="DM PURGE RESUME"
+     AND di.info_name=sbr_infoname
+    DETAIL
+     sbr_startingid = di.info_long_id
+    WITH nocounter
+   ;end select
+   RETURN(sbr_startingid)
+ END ;Subroutine
+ SUBROUTINE (sbr_update_starting_id(sbr_newid=f8) =null)
+   DECLARE sbr_infoname = vc WITH protect, noconstant("")
+   SET sbr_infoname = concat(trim(cnvtstring(jobs->data[job_ndx].template_nbr),3)," - ",trim(
+     cnvtstring(v_log_id),3))
+   UPDATE  FROM dm_info di
+    SET di.info_long_id = sbr_newid, di.updt_applctx = reqinfo->updt_applctx, di.updt_dt_tm =
+     cnvtdatetime(sysdate),
+     di.updt_cnt = (di.updt_cnt+ 1), di.updt_id = reqinfo->updt_id, di.updt_task = reqinfo->updt_task
+    WHERE di.info_domain="DM PURGE RESUME"
+     AND di.info_name=sbr_infoname
+    WITH nocounter
+   ;end update
+   IF (curqual=0)
+    INSERT  FROM dm_info di
+     SET di.info_domain = "DM PURGE RESUME", di.info_name = sbr_infoname, di.info_long_id = sbr_newid,
+      di.info_date = cnvtdatetime(sysdate), di.updt_applctx = reqinfo->updt_applctx, di.updt_dt_tm =
+      cnvtdatetime(sysdate),
+      di.updt_cnt = 0, di.updt_id = reqinfo->updt_id, di.updt_task = reqinfo->updt_task
+     WITH nocounter
+    ;end insert
+   ENDIF
+   COMMIT
+ END ;Subroutine
+ SUBROUTINE sbr_delete_starting_id(null)
+   DECLARE sbr_infoname = vc WITH protect, noconstant("")
+   SET sbr_infoname = concat(trim(cnvtstring(jobs->data[job_ndx].template_nbr),3)," - ",trim(
+     cnvtstring(v_log_id),3))
+   DELETE  FROM dm_info di
+    WHERE di.info_domain="DM PURGE RESUME"
+     AND di.info_name=sbr_infoname
+    WITH nocounter
+   ;end delete
+   COMMIT
+ END ;Subroutine
+ SUBROUTINE (sbr_getrowidnotexists(sbr_whereclause=vc,sbr_tablealias=vc) =vc)
+   IF ((jobs->data[job_ndx].purge_flag != c_audit))
+    RETURN(sbr_whereclause)
+   ENDIF
+   DECLARE sbr_newwhereclause = vc WITH protect, noconstant("")
+   SET sbr_newwhereclause = concat(sbr_whereclause,
+    " and NOT EXISTS (select rowidtbl.purge_table_rowid ","from dm_purge_rowid_list_gttp rowidtbl ",
+    "where rowidtbl.purge_table_rowid = ",sbr_tablealias,
+    ".rowid)")
+   RETURN(sbr_newwhereclause)
+ END ;Subroutine
+ DECLARE sbr_get_min_date(null) = dq8
+ DECLARE batchsize = i2 WITH protect, noconstant(7)
+ DECLARE maxdate = dq8 WITH protect
+ DECLARE curmindate = dq8 WITH protect
+ DECLARE curmaxdate = dq8 WITH protect
+ DECLARE rowsleft = i4 WITH protect, noconstant(request->max_rows)
+ DECLARE v_rows = i4 WITH protect, noconstant(0)
+ DECLARE num = i4 WITH protect, noconstant(0)
+ DECLARE v_errmsg2 = c132 WITH noconstant(fillstring(132," "))
+ DECLARE v_err_code2 = i4 WITH noconstant(0)
+ SET i18nhandle = 0
+ SET h = uar_i18nlocalizationinit(i18nhandle,curprog,"",curcclrev)
+ SET reply->table_name = "CHARGE_MOD"
+ SET reply->rows_between_commit = 500
+ SET reply->status_data.status = "F"
+ DECLARE days_to_keep = i4 WITH protect, noconstant(- (1))
+ FOR (tok_ndx = 1 TO size(request->tokens,5))
+   IF (cnvtupper(request->tokens[tok_ndx].token_str)="DAYSTOKEEP")
+    SET days_to_keep = ceil(cnvtreal(request->tokens[tok_ndx].value))
+   ENDIF
+ ENDFOR
+ SET v_rows = 0
+ IF (days_to_keep < 1)
+  SET reply->err_code = - (1)
+  SET reply->err_msg = uar_i18nbuildmessage(i18nhandle,"DAYSTOKEEP",
+   "You must keep at least 1 day's worth of data.  You entered %1 days or did not enter any value.",
+   "i",days_to_keep)
+  GO TO exit_script
+ ELSE
+  IF (batch_ndx=1)
+   SET curmindate = sbr_get_min_date(null)
+  ELSE
+   SET curmindate = sbr_fetch_starting_id(null)
+  ENDIF
+  SET maxdate = cnvtdatetime((curdate - days_to_keep),curtime3)
+  SET curmaxdate = minval(maxdate,datetimeadd(curmindate,batchsize))
+  WHILE (curmindate <= maxdate
+   AND rowsleft > 0)
+    SELECT INTO "nl:"
+     FROM charge_mod cm
+     WHERE cm.updt_dt_tm >= cnvtdatetime(curmindate)
+      AND cm.updt_dt_tm <= cnvtdatetime(curmaxdate)
+      AND parser(sbr_getrowidnotexists("cm.charge_mod_id+0 > 0","cm"))
+      AND cm.active_ind=0
+      AND  EXISTS (
+     (SELECT
+      c.charge_item_id
+      FROM charge c,
+       interface_file i
+      WHERE c.charge_item_id=cm.charge_item_id
+       AND (i.interface_file_id=(c.interface_file_id - 0))
+       AND i.profit_type_cd=0))
+     DETAIL
+      v_rows += 1
+      IF (mod(v_rows,10)=1)
+       stat = alterlist(reply->rows,(v_rows+ 9))
+      ENDIF
+      reply->rows[v_rows].row_id = cm.rowid
+     WITH nocounter, maxqual(cm,value(rowsleft)), orahintcbo("NO_UNNEST INDEX(C XPKCHARGE)")
+    ;end select
+    SET v_err_code2 = error(v_errmsg2,0)
+    IF (v_err_code2 != 0)
+     SET reply->err_code = v_err_code2
+     SET reply->err_msg = uar_i18nbuildmessage(i18nhandle,"COLLECTERROR",
+      "Failed in row collection: %1","s",nullterm(v_errmsg2))
+     GO TO exit_script
+    ENDIF
+    CALL sbr_update_starting_id(curmindate)
+    SET curmindate = cnvtlookahead("1,S",curmaxdate)
+    SET curmaxdate = minval(maxdate,datetimeadd(curmindate,batchsize))
+    SET rowsleft = (request->max_rows - v_rows)
+  ENDWHILE
+  SET stat = alterlist(reply->rows,v_rows)
+ ENDIF
+ SET reply->status_data.status = "S"
+ SET reply->err_code = 0
+ SUBROUTINE sbr_get_min_date(null)
+   DECLARE zerorowdate = dq8
+   DECLARE mindate = dq8
+   SELECT INTO "nl:"
+    seqval = min(cm.updt_dt_tm)
+    FROM charge_mod cm
+    WHERE cm.charge_mod_id=0.0
+    DETAIL
+     zerorowdate = seqval
+    WITH nocounter
+   ;end select
+   SET v_err_code2 = error(v_errmsg2,0)
+   IF (v_err_code2 != 0)
+    SET reply->err_code = v_err_code2
+    SET reply->err_msg = uar_i18nbuildmessage(i18nhandle,"SELECTERROR1",
+     "Failed to select zero row date:%1","s",nullterm(v_errmsg2))
+    GO TO exit_script
+   ENDIF
+   UPDATE  FROM charge_mod cm
+    SET cm.updt_dt_tm = cnvtdatetime(sysdate)
+    WHERE cm.charge_mod_id=0.0
+    WITH nocounter
+   ;end update
+   SET v_err_code2 = error(v_errmsg2,0)
+   IF (v_err_code2 != 0)
+    SET reply->err_code = v_err_code2
+    SET reply->err_msg = uar_i18nbuildmessage(i18nhandle,"UPDATEERROR1",
+     "Failed to set cm.updt_dt_tm to curdate:%1","s",nullterm(v_errmsg2))
+    ROLLBACK
+    GO TO exit_script
+   ELSE
+    COMMIT
+   ENDIF
+   SELECT INTO "nl:"
+    seqval = min(cm.updt_dt_tm)
+    FROM charge_mod cm
+    DETAIL
+     mindate = seqval
+    WITH nocounter
+   ;end select
+   SET v_err_code2 = error(v_errmsg2,0)
+   IF (v_err_code2 != 0)
+    SET reply->err_code = v_err_code2
+    SET reply->err_msg = uar_i18nbuildmessage(i18nhandle,"SELECTERROR2",
+     "Failed to select zero row date:%1","s",nullterm(v_errmsg2))
+    GO TO exit_script
+   ENDIF
+   UPDATE  FROM charge_mod cm
+    SET cm.updt_dt_tm = cnvtdatetime(zerorowdate)
+    WHERE cm.charge_mod_id=0.0
+    WITH nocounter
+   ;end update
+   SET v_err_code2 = error(v_errmsg2,0)
+   IF (v_err_code2 != 0)
+    SET reply->err_code = v_err_code2
+    SET reply->err_msg = uar_i18nbuildmessage(i18nhandle,"UPDATEERROR2",
+     "Failed to set cm.updt_dt_tm to original date:%1","s",nullterm(v_errmsg2))
+    ROLLBACK
+    GO TO exit_script
+   ELSE
+    COMMIT
+   ENDIF
+   RETURN(mindate)
+ END ;Subroutine
+#exit_script
+END GO

@@ -1,0 +1,90 @@
+CREATE PROGRAM edw_create_gen_lab_result_file:dba
+ SELECT INTO value(gen_lab_result_extractfile)
+  FROM (dummyt d  WITH seq = value(gen_lab_rslt_cnt))
+  WHERE gen_lab_rslt_cnt > 0
+  DETAIL
+   col 0,
+   CALL print(trim(health_system_id)), v_bar,
+   CALL print(trim(health_system_source_id)), v_bar,
+   CALL print(trim(cnvtstring(gen_lab_result_info->qual[d.seq].gen_lab_order_sk,16))),
+   v_bar,
+   CALL print(trim(cnvtstring(gen_lab_result_info->qual[d.seq].gen_lab_result_sk,16))), v_bar,
+   CALL print(trim(cnvtstring(gen_lab_result_info->qual[d.seq].task_assay_sk,16))), v_bar,
+   CALL print(trim(cnvtstring(gen_lab_result_info->qual[d.seq].biological_category_ref,16))),
+   v_bar,
+   CALL print(trim(cnvtstring(gen_lab_result_info->qual[d.seq].result_status_ref,16))), v_bar,
+   CALL print(trim(substring(1,2000,replace(gen_lab_result_info->qual[d.seq].result_value_formatted,
+      str_find,str_replace,3)))), v_bar,
+   CALL print(trim(cnvtstring(gen_lab_result_info->qual[d.seq].codified_result_nomen,16))),
+   v_bar,
+   CALL print(trim(replace(gen_lab_result_info->qual[d.seq].result_raw_value_txt,str_find,str_replace,
+     3))), v_bar,
+   CALL print(trim(replace(gen_lab_result_info->qual[d.seq].result_value_txt,str_find,str_replace,3))
+   ), v_bar,
+   CALL print(trim(datetimezoneformat(evaluate(curutc,1,gen_lab_result_info->qual[d.seq].
+      result_value_dt_tm,0,cnvtdatetimeutc(gen_lab_result_info->qual[d.seq].result_value_dt_tm,3)),
+     utc_timezone_index,"MM/DD/YYYY HH:mm:ss"))),
+   v_bar,
+   CALL print(trim(cnvtstring(gen_lab_result_info->qual[d.seq].result_value_tm_zn,16))), v_bar,
+   CALL print(evaluate(datetimezoneformat(gen_lab_result_info->qual[d.seq].result_value_dt_tm,cnvtint
+     (gen_lab_result_info->qual[d.seq].result_value_tm_zn),"HHmmsscc"),"00000000","0","        ","0",
+    "1")), v_bar,
+   CALL print(trim(gen_lab_result_info->qual[d.seq].result_value_numeric)),
+   v_bar,
+   CALL print(trim(gen_lab_result_info->qual[d.seq].result_raw_value_numeric)), v_bar,
+   CALL print(trim(cnvtstring(gen_lab_result_info->qual[d.seq].result_value_unit_ref,16))), v_bar,
+   CALL print(trim(cnvtstring(gen_lab_result_info->qual[d.seq].critical_ref,16))),
+   v_bar,
+   CALL print(trim(cnvtstring(gen_lab_result_info->qual[d.seq].feasible_ref,16))), v_bar,
+   CALL print(trim(cnvtstring(gen_lab_result_info->qual[d.seq].linear_ref,16))), v_bar,
+   CALL print(trim(cnvtstring(gen_lab_result_info->qual[d.seq].normal_ref,16))),
+   v_bar,
+   CALL print(trim(cnvtstring(gen_lab_result_info->qual[d.seq].qc_override_ref,16))), v_bar,
+   CALL print(trim(cnvtstring(gen_lab_result_info->qual[d.seq].review_ref,16))), v_bar,
+   CALL print(trim(cnvtstring(gen_lab_result_info->qual[d.seq].delta_ref,16))),
+   v_bar,
+   CALL print(trim(gen_lab_result_info->qual[d.seq].dilution_factor)), v_bar,
+   CALL print(trim(gen_lab_result_info->qual[d.seq].interface_flg)), v_bar,
+   CALL print(trim(gen_lab_result_info->qual[d.seq].interp_override_ind)),
+   v_bar,
+   CALL print(trim(gen_lab_result_info->qual[d.seq].qual_operator_flg)), v_bar,
+   CALL print(trim(replace(gen_lab_result_info->qual[d.seq].normal_alpha,str_find,str_replace,3))),
+   v_bar,
+   CALL print(trim(gen_lab_result_info->qual[d.seq].normal_high)),
+   v_bar,
+   CALL print(trim(gen_lab_result_info->qual[d.seq].normal_low)), v_bar,
+   CALL print(trim(datetimezoneformat(evaluate(curutc,1,gen_lab_result_info->qual[d.seq].
+      perform_dt_tm,0,cnvtdatetimeutc(gen_lab_result_info->qual[d.seq].perform_dt_tm,3)),
+     utc_timezone_index,"MM/DD/YYYY HH:mm:ss"))), v_bar,
+   CALL print(trim(cnvtstring(gen_lab_result_info->qual[d.seq].perform_prsnl,16))),
+   v_bar,
+   CALL print(trim(cnvtstring(gen_lab_result_info->qual[d.seq].perform_tm_zn,16))), v_bar,
+   CALL print(evaluate(datetimezoneformat(gen_lab_result_info->qual[d.seq].perform_dt_tm,cnvtint(
+      gen_lab_result_info->qual[d.seq].perform_tm_zn),"HHmmsscc"),"00000000","0","        ","0",
+    "1")), v_bar,
+   CALL print(trim(cnvtstring(gen_lab_result_info->qual[d.seq].reference_range_factor_sk,16))),
+   v_bar,
+   CALL print(trim(cnvtstring(gen_lab_result_info->qual[d.seq].repeat_seq,16))), v_bar,
+   CALL print(trim(cnvtstring(gen_lab_result_info->qual[d.seq].result_type_ref,16))), v_bar,
+   CALL print(trim(cnvtstring(gen_lab_result_info->qual[d.seq].perform_svc_res_dept_hier_sk,16))),
+   v_bar,
+   CALL print(trim(datetimezoneformat(evaluate(curutc,1,gen_lab_result_info->qual[d.seq].
+      verified_dt_tm,0,cnvtdatetimeutc(gen_lab_result_info->qual[d.seq].verified_dt_tm,3)),
+     utc_timezone_index,"MM/DD/YYYY HH:mm:ss"))), v_bar,
+   CALL print(trim(cnvtstring(gen_lab_result_info->qual[d.seq].verified_tm_zn,16))), v_bar,
+   CALL print(evaluate(datetimezoneformat(gen_lab_result_info->qual[d.seq].verified_dt_tm,cnvtint(
+      gen_lab_result_info->qual[d.seq].verified_tm_zn),"HHmmsscc"),"00000000","0","        ","0",
+    "1")),
+   v_bar,
+   CALL print(trim(cnvtstring(gen_lab_result_info->qual[d.seq].verified_prsnl,16))), v_bar,
+   CALL print(trim(replace(gen_lab_result_info->qual[d.seq].reference_lab,str_find,str_replace,3))),
+   v_bar, "3",
+   v_bar,
+   CALL print(trim(extract_dt_tm_fmt)), v_bar,
+   "1", v_bar, v_bar,
+   v_bar, row + 1
+  WITH noheading, nocounter, format = lfstream,
+   maxcol = 35000, maxrow = 1, append
+ ;end select
+ SET script_version = "004 05/23/16 mf025696"
+END GO

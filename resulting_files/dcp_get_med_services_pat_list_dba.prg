@@ -1,0 +1,138 @@
+CREATE PROGRAM dcp_get_med_services_pat_list:dba
+ RECORD reply(
+   1 qual[*]
+     2 person_id = f8
+     2 encntr_id = f8
+     2 name_full_formatted = vc
+     2 priority_flag = i2
+     2 active_ind = i2
+   1 status_data
+     2 status = c1
+     2 subeventstatus[1]
+       3 operationname = c8
+       3 operationstatus = c1
+       3 targetobjectname = c15
+       3 targetobjectvalue = vc
+ )
+ RECORD temp(
+   1 org_cnt = i2
+   1 orglist[*]
+     2 org_id = f8
+     2 confid_level = i4
+ )
+ SET encntr_org_sec_ind = 0
+ SET confid_ind = 0
+ SET count1 = 0
+ SET reply->status_data.status = "F"
+ SET nbr_to_get = cnvtint(size(request->qual,5))
+ SET e_dt_tm = cnvtdatetime(curdate,curtime3)
+ SET cur_dt_tm = cnvtdatetime(curdate,curtime3)
+ IF ((request->lag_minutes > 0))
+  SET interval = build(abs(request->lag_minutes),"min")
+  SET e_dt_tm = cnvtlookbehind(interval,cnvtdatetime(curdate,curtime3))
+ ENDIF
+ IF (validate(ccldminfo->mode,0))
+  SET encntr_org_sec_ind = ccldminfo->sec_org_reltn
+  SET confid_ind = ccldminfo->sec_confid
+ ELSE
+  SELECT INTO "nl:"
+   FROM dm_info di
+   PLAN (di
+    WHERE di.info_domain="SECURITY"
+     AND di.info_name IN ("SEC_ORG_RELTN", "SEC_CONFID"))
+   DETAIL
+    IF (di.info_name="SEC_ORG_RELTN"
+     AND di.info_number=1)
+     encntr_org_sec_ind = 1
+    ELSEIF (di.info_name="SEC_CONFID"
+     AND di.info_number=1)
+     confid_ind = 1
+    ENDIF
+   WITH nocounter
+  ;end select
+ ENDIF
+ IF (((encntr_org_sec_ind=1) OR (confid_ind=1)) )
+  SET temp->org_cnt = 0
+  SELECT INTO "nl:"
+   c.collation_seq
+   FROM prsnl_org_reltn por,
+    (dummyt d  WITH seq = 1),
+    code_value c
+   PLAN (por
+    WHERE (por.person_id=reqinfo->updt_id)
+     AND por.active_ind=1
+     AND por.beg_effective_dt_tm <= cnvtdatetime(curdate,curtime3)
+     AND por.end_effective_dt_tm >= cnvtdatetime(curdate,curtime3))
+    JOIN (d)
+    JOIN (c
+    WHERE c.code_value=por.confid_level_cd)
+   HEAD REPORT
+    count = 0
+   DETAIL
+    count = (count+ 1), stat = alterlist(temp->orglist,count), temp->orglist[count].org_id = por
+    .organization_id
+    IF (confid_ind=1)
+     IF (c.collation_seq > 0)
+      temp->orglist[count].confid_level = c.collation_seq
+     ELSE
+      temp->orglist[count].confid_level = 0
+     ENDIF
+    ELSE
+     temp->orglist[count].confid_level = 9999
+    ENDIF
+   FOOT REPORT
+    temp->org_cnt = count
+   WITH nocounter, outerjoin = d
+  ;end select
+ ENDIF
+ IF ((temp->org_cnt=0))
+  SET temp->org_cnt = 1
+ ENDIF
+ SELECT INTO "nl:"
+  FROM (dummyt d  WITH seq = value(nbr_to_get)),
+   encntr_loc_hist elh,
+   encounter e,
+   code_value c1,
+   person p,
+   (dummyt d2  WITH seq = value(temp->org_cnt))
+  PLAN (elh
+   WHERE elh.end_effective_dt_tm >= cnvtdatetime(e_dt_tm)
+    AND (elh.med_service_cd=request->med_service_cd))
+   JOIN (e
+   WHERE e.encntr_id=elh.encntr_id)
+   JOIN (d
+   WHERE (e.encntr_type_class_cd=request->qual[d.seq].patient_type))
+   JOIN (c1
+   WHERE c1.code_value=e.confid_level_cd)
+   JOIN (d2
+   WHERE ((encntr_org_sec_ind=0
+    AND confid_ind=0) OR ((e.organization_id=temp->orglist[d2.seq].org_id)
+    AND (temp->orglist[d2.seq].confid_level >= c1.collation_seq))) )
+   JOIN (p
+   WHERE p.person_id=e.person_id)
+  HEAD REPORT
+   count1 = 0
+  DETAIL
+   count1 = (count1+ 1)
+   IF (count1 > size(reply->qual,5))
+    stat = alterlist(reply->qual,(count1+ 10))
+   ENDIF
+   reply->qual[count1].person_id = e.person_id, reply->qual[count1].encntr_id = e.encntr_id, reply->
+   qual[count1].name_full_formatted = p.name_full_formatted,
+   reply->qual[count1].priority_flag = 0
+   IF (elh.end_effective_dt_tm > cnvtdatetime(cur_dt_tm))
+    reply->qual[count1].active_ind = 1
+   ELSE
+    reply->qual[count1].active_ind = 0
+   ENDIF
+  FOOT REPORT
+   stat = alterlist(reply->qual,count1)
+  WITH nocounter
+ ;end select
+ IF (curqual=0)
+  SET reply->status_data.status = "Z"
+ ELSE
+  SET reply->status_data.status = "S"
+ ENDIF
+ CALL echorecord(reply)
+END GO

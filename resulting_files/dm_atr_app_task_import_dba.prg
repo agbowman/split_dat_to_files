@@ -1,0 +1,46 @@
+CREATE PROGRAM dm_atr_app_task_import:dba
+ FREE SET status
+ RECORD status(
+   1 qual[*]
+     2 exist = i1
+ )
+ SET stat = alterlist(status->qual,request->atr_count)
+ CALL echo("Importing Application-Task relations into clinical tables...")
+ SELECT INTO "nl:"
+  at.task_number
+  FROM application_task_r at,
+   (dummyt d  WITH seq = value(request->atr_count))
+  PLAN (d)
+   JOIN (at
+   WHERE (at.application_number=request->atr_list[d.seq].application_number)
+    AND (at.task_number=request->atr_list[d.seq].task_number))
+  DETAIL
+   status->qual[d.seq].exist = 1
+  WITH nocounter
+ ;end select
+ CALL echo("  Inserting new Application-Task relations into clinical tables...")
+ INSERT  FROM application_task_r at,
+   (dummyt d  WITH seq = value(request->atr_count))
+  SET at.seq = 1, at.application_number = request->atr_list[d.seq].application_number, at.task_number
+    = request->atr_list[d.seq].task_number,
+   at.updt_dt_tm = cnvtdatetime(curdate,curtime3), at.updt_id = 0.0, at.updt_task = 0,
+   at.updt_cnt = 0, at.updt_applctx = 0
+  PLAN (d
+   WHERE (status->qual[d.seq].exist=0)
+    AND (request->atr_list[d.seq].deleted_ind != 1))
+   JOIN (at)
+  WITH nocounter, status(status->qual)
+ ;end insert
+ CALL echo("  Deleting unwanted Application-Task relations from clinical tables...")
+ DELETE  FROM application_task_r at,
+   (dummyt d  WITH seq = value(request->atr_count))
+  SET at.seq = 1
+  PLAN (d
+   WHERE (request->atr_list[d.seq].deleted_ind=1)
+    AND (status->qual[d.seq].exist=1))
+   JOIN (at
+   WHERE (at.application_number=request->atr_list[d.seq].application_number)
+    AND (at.task_number=request->atr_list[d.seq].task_number))
+ ;end delete
+ COMMIT
+END GO

@@ -1,0 +1,70 @@
+CREATE PROGRAM bbt_get_result_aborh:dba
+ RECORD reply(
+   1 qual[10]
+     2 active_ind = i2
+     2 display = c40
+     2 description = c40
+     2 chart_name = vc
+     2 meaning = vc
+     2 cdf_meaning = vc
+     2 standard_aborh_disp = vc
+     2 code_value = f8
+     2 updt_cnt = i4
+     2 standard_aborh_cd = vc
+     2 chartname_cd = vc
+   1 status_data
+     2 status = c1
+     2 subeventstatus[1]
+       3 operationname = c25
+       3 operationstatus = c1
+       3 targetobjectname = c25
+       3 targetobjectvalue = vc
+ )
+ SET reply->status_data.status = "F"
+ SET count1 = 0
+ SELECT INTO "nl:"
+  c.code_value, c.display, cdf.display,
+  cve.field_name, cve.field_value, aborh_disp =
+  IF (cve.field_name="ABORH_cd") uar_get_code_display(cnvtreal(cve.field_value))
+  ELSE " "
+  ENDIF
+  FROM code_value c,
+   code_value_extension cve,
+   common_data_foundation cdf
+  PLAN (c
+   WHERE c.code_set=1643)
+   JOIN (cve
+   WHERE cve.code_value=c.code_value)
+   JOIN (cdf
+   WHERE cdf.cdf_meaning=c.cdf_meaning
+    AND cdf.code_set=1643)
+  ORDER BY c.code_value
+  HEAD c.code_value
+   count1 = (count1+ 1)
+   IF (mod(count1,10)=1
+    AND count1 != 1)
+    stat = alter(reply->qual,(count1+ 9))
+   ENDIF
+   reply->qual[count1].active_ind = c.active_ind, reply->qual[count1].display = c.display, reply->
+   qual[count1].description = c.description,
+   reply->qual[count1].code_value = c.code_value, reply->qual[count1].updt_cnt = c.updt_cnt, reply->
+   qual[count1].meaning = cdf.display,
+   reply->qual[count1].cdf_meaning = c.cdf_meaning
+  DETAIL
+   IF (cve.field_name="ABORH_cd")
+    reply->qual[count1].standard_aborh_cd = cve.field_value, reply->qual[count1].standard_aborh_disp
+     = aborh_disp
+   ENDIF
+   IF (cve.field_name="ChartName")
+    reply->qual[count1].chart_name = cve.field_value
+   ENDIF
+  WITH counter, outerjoin = d
+ ;end select
+ IF (curqual != 0)
+  SET reply->status_data.status = "S"
+ ELSE
+  SET reply->status_data.status = "Z"
+ ENDIF
+ SET stat = alter(reply->qual,count1)
+#stop
+END GO

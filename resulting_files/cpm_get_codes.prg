@@ -1,0 +1,68 @@
+CREATE PROGRAM cpm_get_codes
+ RECORD reply(
+   1 code_set_display = c40
+   1 code_set_description = c60
+   1 qual[1]
+     2 code_value = f8
+     2 display = c50
+     2 code_disp_key = c50
+     2 description = c100
+     2 definition = c100
+     2 cdf_meaning = c100
+     2 collation_seq = i4
+     2 status_cd = f8
+     2 active_ind = i2
+     2 updt_cnt = i4
+   1 status_data
+     2 status = c1
+     2 subeventstatus[1]
+       3 sourceobjectname = c15
+       3 sourceobjectqual = i4
+       3 sourceobjectvalue = c50
+       3 operationname = c15
+       3 operationstatus = c1
+       3 targetobjectname = c15
+       3 targetobjectvalue = c50
+       3 sub_event_dt_tm = di8
+ )
+ CALL echo(curuser)
+ SET reply->status_data.status = "F"
+ SELECT INTO "nl:"
+  c.display, c.description
+  FROM code_value_set c
+  WHERE (c.code_set=request->code_set)
+  DETAIL
+   reply->code_set_display = c.display, reply->code_set_description = c.description
+  WITH nocounter
+ ;end select
+ IF (curqual != 0)
+  SET reply->status_data.status = "S"
+ ELSE
+  EXECUTE goto stop
+ ENDIF
+ SET count1 = 0
+ SELECT INTO "nl:"
+  c.*
+  FROM code_value c
+  WHERE (c.code_set=request->code_set)
+  HEAD REPORT
+   count1 = 0
+  DETAIL
+   count1 = (count1+ 1)
+   IF (mod(count1,10)=2)
+    stat = alter(reply->qual,(count1+ 10))
+   ENDIF
+   reply->qual[count1].code_value = c.code_value, reply->qual[count1].display = c.display, reply->
+   qual[count1].code_disp_key = c.display_key,
+   reply->qual[count1].description = c.description, reply->qual[count1].definition = c.definition,
+   reply->qual[count1].cdf_meaning = c.cdf_meaning,
+   reply->qual[count1].collation_seq = c.collation_seq, reply->qual[count1].status_cd = c.status_cd,
+   reply->qual[count1].active_ind = c.active_ind
+  WITH counter
+ ;end select
+ IF (curqual != 0)
+  SET reply->status_data.status = "S"
+ ENDIF
+ SET stat = alter(reply->qual,count1)
+#stop
+END GO

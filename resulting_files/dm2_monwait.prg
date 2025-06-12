@@ -1,0 +1,3 @@
+CREATE PROGRAM dm2_monwait
+ EXECUTE monlock
+END GO

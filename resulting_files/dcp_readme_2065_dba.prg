@@ -1,0 +1,33 @@
+CREATE PROGRAM dcp_readme_2065:dba
+ IF ( NOT (validate(readme_data,0)))
+  FREE SET readme_data
+  RECORD readme_data(
+    1 ocd = i4
+    1 readme_id = f8
+    1 instance = i4
+    1 readme_type = vc
+    1 description = vc
+    1 script = vc
+    1 check_script = vc
+    1 data_file = vc
+    1 par_file = vc
+    1 blocks = i4
+    1 log_rowid = vc
+    1 status = vc
+    1 message = c255
+    1 options = vc
+    1 driver = vc
+    1 batch_dt_tm = dq8
+  )
+ ENDIF
+ SET readme_data->message = "Updating codeset 17169."
+ UPDATE  FROM code_value cv
+  SET cv.cdf_meaning = "PTDISCHARGE"
+  WHERE cv.cki="CKI.CODEVALUE!22109"
+  WITH nocounter
+ ;end update
+ COMMIT
+ SET readme_data->status = "S"
+ SET readme_data->message = "CDF_MEANING of PTDISCHARGE has been added to codeset 17169."
+ EXECUTE dm_readme_status
+END GO

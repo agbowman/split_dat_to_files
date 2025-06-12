@@ -1,0 +1,325 @@
+CREATE PROGRAM ags_mak_prsnl_org_tasks:dba
+ CALL echo("***")
+ CALL echo("***   BEG AGS_MAK_PRSNL_ORG_TASKS")
+ CALL echo("***")
+ DECLARE found_org = i2 WITH public, noconstant(true)
+ DECLARE found_prsnl = i2 WITH public, noconstant(true)
+ DECLARE min_batch_id = f8 WITH public, noconstant(0.0)
+ DECLARE max_batch_id = f8 WITH public, noconstant(0.0)
+ DECLARE temp_batch_id = f8 WITH public, noconstant(0.0)
+ DECLARE batch_size = i4 WITH public, constant(5000)
+ DECLARE max_task_size = i4 WITH public, noconstant(1000000)
+ IF ((data_info->task_size > 0))
+  SET max_task_size = data_info->task_size
+ ENDIF
+ FREE RECORD item
+ RECORD item(
+   1 qual_knt = i4
+   1 qual[*]
+     2 ags_task_id = f8
+     2 ags_job_id = f8
+     2 task_type = c30
+     2 batch_program = vc
+     2 batch_start_id = f8
+     2 batch_end_id = f8
+     2 batch_size = i4
+ )
+ SET log->qual_knt = (log->qual_knt+ 1)
+ SET stat = alterlist(log->qual,log->qual_knt)
+ SET log->qual[log->qual_knt].smsgtype = "INFO"
+ SET log->qual[log->qual_knt].dmsg_dt_tm = cnvtdatetime(curdate,curtime3)
+ SET log->qual[log->qual_knt].smsg = "BEG >> AGS_MAK_PRSNL_ORG_TASKS"
+ CALL echo("***")
+ CALL echo("***   Find ORG Batch Id Values")
+ CALL echo("***")
+ SET min_batch_id = 0.0
+ SET max_batch_id = 0.0
+ SET ierrcode = error(serrmsg,1)
+ SET ierrcode = 0
+ SELECT INTO "nl:"
+  little_id = min(o.ags_org_data_id), big_id = max(o.ags_org_data_id)
+  FROM ags_org_data o
+  PLAN (o
+   WHERE (o.ags_job_id=data_info->ags_job_id)
+    AND o.status="LOADING")
+  FOOT REPORT
+   min_batch_id = little_id, max_batch_id = big_id
+  WITH nocounter
+ ;end select
+ SET ierrcode = error(serrmsg,1)
+ IF (ierrcode > 0)
+  SET failed = select_error
+  SET table_name = "GET BATCH_ID VALUES"
+  SET ilog_status = 1
+  SET log->qual_knt = (log->qual_knt+ 1)
+  SET stat = alterlist(log->qual,log->qual_knt)
+  SET log->qual[log->qual_knt].smsgtype = "ERROR"
+  SET log->qual[log->qual_knt].dmsg_dt_tm = cnvtdatetime(curdate,curtime3)
+  SET log->qual[log->qual_knt].smsg = concat("GET ORG BATCH_ID VALUES :: Select Error :: ",trim(
+    serrmsg))
+  SET serrmsg = log->qual[log->qual_knt].smsg
+  GO TO exit_script
+ ENDIF
+ CALL echo("***")
+ CALL echo(build("***   AGS_ORG_DATA min_batch_id :",min_batch_id))
+ CALL echo(build("***   AGS_ORG_DATA max_batch_id :",max_batch_id))
+ CALL echo("***")
+ IF (((min_batch_id < 1) OR (max_batch_id < 1)) )
+  SET found_org = false
+ ENDIF
+ CALL echo("***")
+ CALL echo("***   Create ORG Tasks")
+ CALL echo("***")
+ WHILE (min_batch_id <= max_batch_id
+  AND min_batch_id >= 1)
+   IF (((min_batch_id+ max_task_size) < max_batch_id))
+    SET temp_batch_id = (min_batch_id+ max_task_size)
+   ELSE
+    SET temp_batch_id = max_batch_id
+   ENDIF
+   SET item->qual_knt = (item->qual_knt+ 1)
+   SET stat = alterlist(item->qual,item->qual_knt)
+   SET item->qual[item->qual_knt].ags_job_id = data_info->ags_job_id
+   SET item->qual[item->qual_knt].task_type = "ORG"
+   SET item->qual[item->qual_knt].batch_start_id = min_batch_id
+   SET item->qual[item->qual_knt].batch_end_id = temp_batch_id
+   SET item->qual[item->qual_knt].batch_size = batch_size
+   SET item->qual[item->qual_knt].batch_program = "ags_load_org"
+   SET ierrcode = error(serrmsg,1)
+   SET ierrcode = 0
+   SELECT INTO "nl:"
+    num = seq(gs_seq,nextval)
+    FROM dual
+    DETAIL
+     item->qual[item->qual_knt].ags_task_id = cnvtreal(num)
+    WITH nocounter
+   ;end select
+   SET ierrcode = error(serrmsg,1)
+   IF (ierrcode > 0)
+    SET failed = gen_nbr_error
+    SET table_name = "GET NEW AGS_TASK_ID"
+    SET ilog_status = 1
+    SET log->qual_knt = (log->qual_knt+ 1)
+    SET stat = alterlist(log->qual,log->qual_knt)
+    SET log->qual[log->qual_knt].smsgtype = "ERROR"
+    SET log->qual[log->qual_knt].dmsg_dt_tm = cnvtdatetime(curdate,curtime3)
+    SET log->qual[log->qual_knt].smsg = concat("GET NEW AGS_TASK_ID :: Script Failure :: ",trim(
+      serrmsg))
+    SET serrmsg = log->qual[log->qual_knt].smsg
+    GO TO exit_script
+   ENDIF
+   SET min_batch_id = (temp_batch_id+ 1)
+ ENDWHILE
+ CALL echo("***")
+ CALL echo("***   Find PRSNL Batch Id Values")
+ CALL echo("***")
+ SET min_batch_id = 0.0
+ SET max_batch_id = 0.0
+ SET ierrcode = error(serrmsg,1)
+ SET ierrcode = 0
+ SELECT INTO "nl:"
+  little_id = min(p.ags_prsnl_data_id), big_id = max(p.ags_prsnl_data_id)
+  FROM ags_prsnl_data p
+  PLAN (p
+   WHERE (p.ags_job_id=data_info->ags_job_id)
+    AND p.status="LOADING")
+  FOOT REPORT
+   min_batch_id = little_id, max_batch_id = big_id
+  WITH nocounter
+ ;end select
+ SET ierrcode = error(serrmsg,1)
+ IF (ierrcode > 0)
+  SET failed = select_error
+  SET table_name = "GET BATCH_ID VALUES"
+  SET ilog_status = 1
+  SET log->qual_knt = (log->qual_knt+ 1)
+  SET stat = alterlist(log->qual,log->qual_knt)
+  SET log->qual[log->qual_knt].smsgtype = "ERROR"
+  SET log->qual[log->qual_knt].dmsg_dt_tm = cnvtdatetime(curdate,curtime3)
+  SET log->qual[log->qual_knt].smsg = concat("GET PRSNL BATCH_ID VALUES :: Select Error :: ",trim(
+    serrmsg))
+  SET serrmsg = log->qual[log->qual_knt].smsg
+  GO TO exit_script
+ ENDIF
+ CALL echo("***")
+ CALL echo(build("***   AGS_PRSNL_DATA min_batch_id :",min_batch_id))
+ CALL echo(build("***   AGS_PRSNL_DATA max_batch_id :",max_batch_id))
+ CALL echo("***")
+ IF (((min_batch_id < 1) OR (max_batch_id < 1)) )
+  SET found_prsnl = false
+ ENDIF
+ CALL echo("***")
+ CALL echo("***   Create PRSNL Tasks")
+ CALL echo("***")
+ WHILE (min_batch_id <= max_batch_id
+  AND min_batch_id >= 1)
+   IF (((min_batch_id+ max_task_size) < max_batch_id))
+    SET temp_batch_id = (min_batch_id+ max_task_size)
+   ELSE
+    SET temp_batch_id = max_batch_id
+   ENDIF
+   SET item->qual_knt = (item->qual_knt+ 1)
+   SET stat = alterlist(item->qual,item->qual_knt)
+   SET item->qual[item->qual_knt].ags_job_id = data_info->ags_job_id
+   SET item->qual[item->qual_knt].task_type = "PRSNL"
+   SET item->qual[item->qual_knt].batch_start_id = min_batch_id
+   SET item->qual[item->qual_knt].batch_end_id = temp_batch_id
+   SET item->qual[item->qual_knt].batch_size = batch_size
+   SET item->qual[item->qual_knt].batch_program = "ags_load_prsnl"
+   SET ierrcode = error(serrmsg,1)
+   SET ierrcode = 0
+   SELECT INTO "nl:"
+    num = seq(gs_seq,nextval)
+    FROM dual
+    DETAIL
+     item->qual[item->qual_knt].ags_task_id = cnvtreal(num)
+    WITH nocounter
+   ;end select
+   SET ierrcode = error(serrmsg,1)
+   IF (ierrcode > 0)
+    SET failed = gen_nbr_error
+    SET table_name = "GET NEW AGS_TASK_ID"
+    SET ilog_status = 1
+    SET log->qual_knt = (log->qual_knt+ 1)
+    SET stat = alterlist(log->qual,log->qual_knt)
+    SET log->qual[log->qual_knt].smsgtype = "ERROR"
+    SET log->qual[log->qual_knt].dmsg_dt_tm = cnvtdatetime(curdate,curtime3)
+    SET log->qual[log->qual_knt].smsg = concat("GET NEW AGS_TASK_ID :: Script Failure :: ",trim(
+      serrmsg))
+    SET serrmsg = log->qual[log->qual_knt].smsg
+    GO TO exit_script
+   ENDIF
+   SET min_batch_id = (temp_batch_id+ 1)
+ ENDWHILE
+ CALL echorecord(item)
+ IF ((item->qual_knt < 1))
+  IF (found_org=false
+   AND found_prsnl=false)
+   SET failed = input_error
+   SET ilog_status = 1
+   SET log->qual_knt = (log->qual_knt+ 1)
+   SET stat = alterlist(log->qual,log->qual_knt)
+   SET log->qual[log->qual_knt].smsgtype = "ERROR"
+   SET log->qual[log->qual_knt].dmsg_dt_tm = cnvtdatetime(curdate,curtime3)
+   SET log->qual[log->qual_knt].smsg = "No ORG or PRSNL tasks found"
+   GO TO exit_script
+  ELSEIF (found_org=false)
+   SET ilog_status = 2
+   SET log->qual_knt = (log->qual_knt+ 1)
+   SET stat = alterlist(log->qual,log->qual_knt)
+   SET log->qual[log->qual_knt].smsgtype = "WARNING"
+   SET log->qual[log->qual_knt].dmsg_dt_tm = cnvtdatetime(curdate,curtime3)
+   SET log->qual[log->qual_knt].smsg = "No ORG tasks found"
+   GO TO exit_script
+  ELSE
+   SET ilog_status = 2
+   SET log->qual_knt = (log->qual_knt+ 1)
+   SET stat = alterlist(log->qual,log->qual_knt)
+   SET log->qual[log->qual_knt].smsgtype = "WARNING"
+   SET log->qual[log->qual_knt].dmsg_dt_tm = cnvtdatetime(curdate,curtime3)
+   SET log->qual[log->qual_knt].smsg = "No PRSNL tasks found"
+   GO TO exit_script
+  ENDIF
+ ENDIF
+ CALL echo("***")
+ CALL echo("***   Insert Tasks")
+ CALL echo("***")
+ SET ierrcode = error(serrmsg,1)
+ SET ierrcode = 0
+ INSERT  FROM ags_task t,
+   (dummyt d  WITH seq = value(item->qual_knt))
+  SET t.ags_task_id = item->qual[d.seq].ags_task_id, t.ags_job_id = item->qual[d.seq].ags_job_id, t
+   .task_type = item->qual[d.seq].task_type,
+   t.batch_program = item->qual[d.seq].batch_program, t.batch_start_id = item->qual[d.seq].
+   batch_start_id, t.batch_end_id = item->qual[d.seq].batch_end_id,
+   t.batch_size = item->qual[d.seq].batch_size, t.status = "LOADING", t.status_dt_tm = cnvtdatetime(
+    curdate,curtime3)
+  PLAN (d
+   WHERE d.seq > 0)
+   JOIN (t
+   WHERE 1=1)
+  WITH nocounter
+ ;end insert
+ SET ierrcode = error(serrmsg,1)
+ IF (ierrcode > 0)
+  ROLLBACK
+  SET failed = insert_error
+  SET table_name = "AGS_TASK"
+  SET ilog_status = 1
+  SET log->qual_knt = (log->qual_knt+ 1)
+  SET stat = alterlist(log->qual,log->qual_knt)
+  SET log->qual[log->qual_knt].smsgtype = "ERROR"
+  SET log->qual[log->qual_knt].dmsg_dt_tm = cnvtdatetime(curdate,curtime3)
+  SET log->qual[log->qual_knt].smsg = concat("INSERT AGS_TASK ITEMS :: Insert Error :: ",trim(serrmsg
+    ))
+  SET serrmsg = log->qual[log->qual_knt].smsg
+  GO TO exit_script
+ ENDIF
+ COMMIT
+ CALL echo("***")
+ CALL echo("***   Update ORG Data to WAITING")
+ CALL echo("***")
+ SET ierrcode = error(serrmsg,1)
+ SET ierrcode = 0
+ UPDATE  FROM ags_org_data o
+  SET o.status = "WAITING", o.status_dt_tm = cnvtdatetime(curdate,curtime3)
+  PLAN (o
+   WHERE (o.ags_job_id=data_info->ags_job_id)
+    AND o.status="LOADING")
+  WITH nocounter
+ ;end update
+ SET ierrcode = error(serrmsg,1)
+ IF (ierrcode > 0)
+  ROLLBACK
+  SET failed = update_error
+  SET table_name = "AGS_ORG_DATA"
+  SET ilog_status = 1
+  SET log->qual_knt = (log->qual_knt+ 1)
+  SET stat = alterlist(log->qual,log->qual_knt)
+  SET log->qual[log->qual_knt].smsgtype = "ERROR"
+  SET log->qual[log->qual_knt].dmsg_dt_tm = cnvtdatetime(curdate,curtime3)
+  SET log->qual[log->qual_knt].smsg = concat("UPDATE AGS_ORG_DATA ITEMS :: Update Error :: ",trim(
+    serrmsg))
+  SET serrmsg = log->qual[log->qual_knt].smsg
+  GO TO exit_script
+ ENDIF
+ COMMIT
+ CALL echo("***")
+ CALL echo("***   Update PRSNL Data to WAITING")
+ CALL echo("***")
+ SET ierrcode = error(serrmsg,1)
+ SET ierrcode = 0
+ UPDATE  FROM ags_prsnl_data p
+  SET p.status = "WAITING", p.status_dt_tm = cnvtdatetime(curdate,curtime3)
+  PLAN (p
+   WHERE (p.ags_job_id=data_info->ags_job_id)
+    AND p.status="LOADING")
+  WITH nocounter
+ ;end update
+ SET ierrcode = error(serrmsg,1)
+ IF (ierrcode > 0)
+  ROLLBACK
+  SET failed = update_error
+  SET table_name = "AGS_PRSNL_DATA"
+  SET ilog_status = 1
+  SET log->qual_knt = (log->qual_knt+ 1)
+  SET stat = alterlist(log->qual,log->qual_knt)
+  SET log->qual[log->qual_knt].smsgtype = "ERROR"
+  SET log->qual[log->qual_knt].dmsg_dt_tm = cnvtdatetime(curdate,curtime3)
+  SET log->qual[log->qual_knt].smsg = concat("UPDATE AGS_PRSNL_DATA ITEMS :: Update Error :: ",trim(
+    serrmsg))
+  SET serrmsg = log->qual[log->qual_knt].smsg
+  GO TO exit_script
+ ENDIF
+ COMMIT
+#exit_script
+ SET log->qual_knt = (log->qual_knt+ 1)
+ SET stat = alterlist(log->qual,log->qual_knt)
+ SET log->qual[log->qual_knt].smsgtype = "INFO"
+ SET log->qual[log->qual_knt].dmsg_dt_tm = cnvtdatetime(curdate,curtime3)
+ SET log->qual[log->qual_knt].smsg = "END >> AGS_MAK_PRSNL_ORG_TASKS"
+ CALL echo("***")
+ CALL echo("***   END AGS_MAK_PRSNL_ORG_TASKS")
+ CALL echo("***")
+ SET script_ver = "002 01/20/06"
+END GO

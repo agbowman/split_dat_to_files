@@ -1,0 +1,214 @@
+CREATE PROGRAM dm_si_eprescribe_req_log_rows:dba
+ DECLARE output_plan(i_statement_id=vc,i_file=vc,i_debug_str=vc) = null
+ DECLARE sbr_fetch_starting_id(null) = f8
+ DECLARE sbr_update_starting_id(sbr_newid=f8) = null
+ DECLARE sbr_delete_starting_id(null) = null
+ DECLARE sbr_getrowidnotexists(sbr_whereclause=vc,sbr_tablealias=vc) = vc
+ SUBROUTINE output_plan(i_statement_id,i_file,i_debug_str)
+   CALL echo(i_file)
+   SELECT INTO value(i_file)
+    x = substring(1,100,i_debug_str)
+    FROM dual
+    DETAIL
+     x
+    WITH maxcol = 130
+   ;end select
+   FOR (i = 2 TO ceil((size(i_debug_str)/ 100.0)))
+     SELECT INTO value(i_file)
+      x = substring((1+ ((i - 1) * 100)),100,i_debug_str)
+      FROM dual
+      DETAIL
+       x
+      WITH maxcol = 130, append
+     ;end select
+   ENDFOR
+   SELECT INTO value(i_file)
+    x = fillstring(100,"=")
+    FROM dual
+    DETAIL
+     x
+    WITH maxcol = 130, append
+   ;end select
+   SELECT INTO value(i_file)
+    dm_ind = nullind(dm.index_name), p.statement_id, p.id,
+    p.parent_id, p.position, p.operation,
+    p.options, p.object_name, dm.table_name,
+    dm.index_name, dm.column_position, dm.uniqueness,
+    colname = substring(1,30,dm.column_name)
+    FROM plan_table p,
+     dm_user_ind_columns dm
+    PLAN (p
+     WHERE p.statement_id=patstring(i_statement_id))
+     JOIN (dm
+     WHERE outerjoin(p.object_name)=dm.index_name)
+    ORDER BY p.statement_id, p.id, dm.index_name,
+     dm.column_position
+    HEAD REPORT
+     indent = 0, line = fillstring(100,"=")
+    HEAD p.statement_id
+     "PLAN STATEMENT FOR ", p.statement_id, row + 1,
+     line, row + 1, indent = 0
+    HEAD p.id
+     indent = (indent+ 1), col 0, p.id"#####",
+     col + 1, col + indent, indent"###",
+     ")", p.operation, col + 1,
+     p.options, col + 1, p.object_name,
+     col + 1
+    DETAIL
+     IF (dm_ind=0)
+      IF (dm.column_position=1)
+       row + 1, col + (indent+ 10), ">>>",
+       col + 1, dm.uniqueness, col + 1
+      ELSE
+       ","
+      ENDIF
+      CALL print(trim(colname))
+     ENDIF
+    FOOT  p.id
+     row + 1
+    WITH nocounter, maxrow = 1, noformfeed,
+     maxcol = 400, append
+   ;end select
+ END ;Subroutine
+ SUBROUTINE sbr_fetch_starting_id(null)
+   DECLARE sbr_startingid = f8 WITH protect, noconstant(1.0)
+   DECLARE sbr_infoname = vc WITH protect, noconstant("")
+   IF (batch_ndx=1)
+    RETURN(1.0)
+   ENDIF
+   SET sbr_infoname = concat(trim(cnvtstring(jobs->data[job_ndx].template_nbr),3)," - ",trim(
+     cnvtstring(v_log_id),3))
+   SELECT INTO "nl:"
+    FROM dm_info di
+    WHERE di.info_domain="DM PURGE RESUME"
+     AND di.info_name=sbr_infoname
+    DETAIL
+     sbr_startingid = di.info_long_id
+    WITH nocounter
+   ;end select
+   RETURN(sbr_startingid)
+ END ;Subroutine
+ SUBROUTINE sbr_update_starting_id(sbr_newid)
+   DECLARE sbr_infoname = vc WITH protect, noconstant("")
+   SET sbr_infoname = concat(trim(cnvtstring(jobs->data[job_ndx].template_nbr),3)," - ",trim(
+     cnvtstring(v_log_id),3))
+   UPDATE  FROM dm_info di
+    SET di.info_long_id = sbr_newid, di.updt_applctx = reqinfo->updt_applctx, di.updt_dt_tm =
+     cnvtdatetime(curdate,curtime3),
+     di.updt_cnt = (di.updt_cnt+ 1), di.updt_id = reqinfo->updt_id, di.updt_task = reqinfo->updt_task
+    WHERE di.info_domain="DM PURGE RESUME"
+     AND di.info_name=sbr_infoname
+    WITH nocounter
+   ;end update
+   IF (curqual=0)
+    INSERT  FROM dm_info di
+     SET di.info_domain = "DM PURGE RESUME", di.info_name = sbr_infoname, di.info_long_id = sbr_newid,
+      di.info_date = cnvtdatetime(curdate,curtime3), di.updt_applctx = reqinfo->updt_applctx, di
+      .updt_dt_tm = cnvtdatetime(curdate,curtime3),
+      di.updt_cnt = 0, di.updt_id = reqinfo->updt_id, di.updt_task = reqinfo->updt_task
+     WITH nocounter
+    ;end insert
+   ENDIF
+   COMMIT
+ END ;Subroutine
+ SUBROUTINE sbr_delete_starting_id(null)
+   DECLARE sbr_infoname = vc WITH protect, noconstant("")
+   SET sbr_infoname = concat(trim(cnvtstring(jobs->data[job_ndx].template_nbr),3)," - ",trim(
+     cnvtstring(v_log_id),3))
+   DELETE  FROM dm_info di
+    WHERE di.info_domain="DM PURGE RESUME"
+     AND di.info_name=sbr_infoname
+    WITH nocounter
+   ;end delete
+   COMMIT
+ END ;Subroutine
+ SUBROUTINE sbr_getrowidnotexists(sbr_whereclause,sbr_tablealias)
+   IF ((jobs->data[job_ndx].purge_flag != c_audit))
+    RETURN(sbr_whereclause)
+   ENDIF
+   DECLARE sbr_newwhereclause = vc WITH protect, noconstant("")
+   SET sbr_newwhereclause = concat(sbr_whereclause,
+    " and NOT EXISTS (select rowidtbl.purge_table_rowid ","from dm_purge_rowid_list_gttp rowidtbl ",
+    "where rowidtbl.purge_table_rowid = ",sbr_tablealias,
+    ".rowid)")
+   RETURN(sbr_newwhereclause)
+ END ;Subroutine
+ SET reply->status_data.status = "F"
+ DECLARE v_days_to_keep = f8 WITH protect, noconstant(0.0)
+ DECLARE v_errmsg2 = c132 WITH protect, noconstant(" ")
+ DECLARE v_err_code2 = i4 WITH protect, noconstant(0)
+ DECLARE tok_ndx = i4 WITH private, noconstant(0)
+ DECLARE row_cnt = i4 WITH private, noconstant(0)
+ DECLARE rrs_sys_match_o = f8 WITH protect, noconstant(uar_get_code_by("MEANING",3420,"SYS_MATCH_O"))
+ DECLARE rrs_sys_match_p = f8 WITH protect, noconstant(uar_get_code_by("MEANING",3420,"SYS_MATCH_P"))
+ DECLARE rrs_unmatched = f8 WITH protect, noconstant(uar_get_code_by("MEANING",3420,"UNMATCHED"))
+ DECLARE rrs_verified = f8 WITH protect, noconstant(uar_get_code_by("MEANING",3420,"VERIFIED"))
+ IF (rrs_sys_match_o=0.0)
+  SET rrs_sys_match_o = - (1.0)
+ ENDIF
+ IF (rrs_sys_match_p=0.0)
+  SET rrs_sys_match_p = - (1.0)
+ ENDIF
+ IF (rrs_unmatched=0.0)
+  SET rrs_unmatched = - (1.0)
+ ENDIF
+ IF (rrs_verified=0.0)
+  SET rrs_verified = - (1.0)
+ ENDIF
+ SET i18nhandle = 0
+ SET h = uar_i18nlocalizationinit(i18nhandle,curprog,"",curcclrev)
+ SET reply->table_name = "SI_EPRESCRIBE_REQ_LOG"
+ SET reply->rows_between_commit = 10000
+ FOR (tok_ndx = 1 TO size(request->tokens,5))
+   IF ((request->tokens[tok_ndx].token_str="DAYSTOKEEP"))
+    SET v_days_to_keep = cnvtreal(request->tokens[tok_ndx].value)
+   ENDIF
+ ENDFOR
+ IF (v_days_to_keep < 0)
+  SET reply->err_code = - (1)
+  SET reply->err_msg = uar_i18nbuildmessage(i18nhandle,"s1",
+   "Days to keep cannot be negative.  You entered %1 days.","s",nullterm(trim(cnvtstring(
+      v_days_to_keep),3)))
+ ELSE
+  SELECT INTO "nl:"
+   serl.rowid
+   FROM si_eprescribe_req_log serl
+   WHERE serl.si_eprescribe_req_log_id > 0
+    AND  NOT (serl.si_eprescribe_req_log_id IN (
+   (SELECT
+    serl2.si_eprescribe_req_log_id
+    FROM si_eprescribe_req_log serl2,
+     ib_rx_req irr,
+     ib_rx_req_action irra
+    WHERE serl2.si_eprescribe_req_log_id > 0
+     AND serl2.updt_dt_tm < cnvtdatetime((curdate - v_days_to_keep),curtime3)
+     AND irr.trans_identifier=serl2.message_ident
+     AND irra.ib_rx_req_id=irr.ib_rx_req_id
+     AND irra.end_effective_dt_tm > cnvtdatetime(curdate,curtime3)
+     AND irra.req_status_cd IN (rrs_sys_match_o, rrs_sys_match_p, rrs_unmatched, rrs_verified))))
+    AND parser(sbr_getrowidnotexists(
+     "serl.updt_dt_tm < cnvtdatetime(curdate - v_days_to_keep,curtime3)","serl"))
+   HEAD REPORT
+    row_cnt = 0
+   DETAIL
+    row_cnt = (row_cnt+ 1)
+    IF (mod(row_cnt,50)=1)
+     stat = alterlist(reply->rows,(row_cnt+ 49))
+    ENDIF
+    reply->rows[row_cnt].row_id = serl.rowid
+   FOOT REPORT
+    stat = alterlist(reply->rows,row_cnt)
+   WITH nocounter, maxqual(serl,value(cnvtint(request->max_rows)))
+  ;end select
+  SET v_errmsg2 = fillstring(132," ")
+  SET v_err_code2 = 0
+  SET v_err_code2 = error(v_errmsg2,1)
+  IF (v_err_code2=0)
+   SET reply->status_data.status = "S"
+   SET reply->err_code = 0
+  ELSE
+   SET reply->err_code = v_err_code2
+   SET reply->err_msg = v_errmsg2
+  ENDIF
+ ENDIF
+END GO

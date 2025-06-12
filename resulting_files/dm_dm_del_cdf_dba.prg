@@ -1,0 +1,143 @@
+CREATE PROGRAM dm_dm_del_cdf:dba
+ RECORD reply(
+   1 qual[*]
+     2 code_set = i4
+     2 cdf_meaning = c12
+     2 status = c2
+   1 status_data
+     2 status = c1
+     2 subeventstatus[1]
+       3 operationname = c15
+       3 operationstatus = c1
+       3 targetobjectname = c15
+       3 targetobjectvalue = vc
+ )
+ SET reply->status_data.status = "F"
+ SET number_to_del = size(request->qual,5)
+ SET stat = alterlist(reply->qual,number_to_del)
+ SET failures = 0
+ SET x = 0
+ FOR (x = 1 TO number_to_del)
+   FREE SET r1
+   RECORD r1(
+     1 rdate = dq8
+   )
+   SET r1->rdate = 0
+   SELECT INTO "NL:"
+    dac.schema_date
+    FROM dm_adm_code_value_extension dac
+    WHERE (dac.code_set=request->code_set)
+     AND (dac.code_value=
+    (SELECT
+     a.code_value
+     FROM dm_adm_code_value a
+     WHERE (a.code_set=request->code_set)
+      AND a.cdf_meaning=trim(request->qual[x].cdf_meaning)))
+    DETAIL
+     IF ((dac.schema_date > r1->rdate))
+      r1->rdate = dac.schema_date
+     ENDIF
+    WITH nocounter
+   ;end select
+   UPDATE  FROM dm_adm_code_value_extension dcve
+    SET dcve.delete_ind = 1
+    WHERE (dcve.code_set=request->code_set)
+     AND (dcve.code_value=
+    (SELECT
+     a.code_value
+     FROM dm_adm_code_value a
+     WHERE (a.code_set=request->code_set)
+      AND a.cdf_meaning=trim(request->qual[x].cdf_meaning)))
+     AND datetimediff(dcve.schema_date,cnvtdatetime(r1->rdate))=0
+    WITH nocounter
+   ;end update
+   FREE SET r2
+   RECORD r2(
+     1 rdate = dq8
+   )
+   SET r2->rdate = 0
+   SELECT INTO "NL:"
+    dac.schema_date
+    FROM dm_adm_code_value_alias dac
+    WHERE (dac.code_set=request->code_set)
+     AND (dcva.code_value=
+    (SELECT
+     a.code_value
+     FROM dm_adm_code_value a
+     WHERE (a.code_set=request->code_set)
+      AND a.cdf_meaning=trim(request->qual[x].cdf_meaning)))
+    DETAIL
+     IF ((dac.schema_date > r2->rdate))
+      r2->rdate = dac.schema_date
+     ENDIF
+    WITH nocounter
+   ;end select
+   UPDATE  FROM dm_adm_code_value_alias dcva
+    SET dcva.delete_ind = 1
+    WHERE (dcva.code_set=request->code_set)
+     AND (dcva.code_value=
+    (SELECT
+     a.code_value
+     FROM dm_adm_code_value a
+     WHERE (a.code_set=request->code_set)
+      AND a.cdf_meaning=trim(request->qual[x].cdf_meaning)))
+     AND datetimediff(dcva.schema_date,cnvtdatetime(r2->rdate))=0
+    WITH nocounter
+   ;end update
+   FREE SET r3
+   RECORD r3(
+     1 rdate = dq8
+   )
+   SET r3->rdate = 0
+   SELECT INTO "NL:"
+    dac.schema_date
+    FROM dm_adm_code_value dac
+    WHERE (dac.code_set=request->code_set)
+     AND dac.cdf_meaning=trim(request->qual[x].cdf_meaning)
+    DETAIL
+     IF ((dac.schema_date > r3->rdate))
+      r3->rdate = dac.schema_date
+     ENDIF
+    WITH nocounter
+   ;end select
+   UPDATE  FROM dm_adm_code_value c
+    SET c.delete_ind = 1
+    WHERE (c.code_set=request->code_set)
+     AND c.cdf_meaning=trim(request->qual[x].cdf_meaning)
+     AND datetimediff(c.schema_date,cnvtdatetime(r3->rdate))=0
+    WITH nocounter
+   ;end update
+   FREE SET r4
+   RECORD r4(
+     1 rdate = dq8
+   )
+   SET r4->rdate = 0
+   SELECT INTO "NL:"
+    dac.schema_date
+    FROM dm_adm_common_data_foundation dac
+    WHERE (dac.code_set=request->code_set)
+     AND dac.cdf_meaning=trim(request->qual[x].cdf_meaning)
+    DETAIL
+     IF ((dac.schema_date > r4->rdate))
+      r4->rdate = dac.schema_date
+     ENDIF
+    WITH nocounter
+   ;end select
+   UPDATE  FROM dm_adm_common_data_foundation c
+    SET c.delete_ind = 1
+    WHERE (c.code_set=request->code_set)
+     AND (c.cdf_meaning=request->qual[x].cdf_meaning)
+     AND datetimediff(c.schema_date,cnvtdatetime(r4->rdate))=0
+    WITH nocounter
+   ;end update
+   IF (curqual > 0)
+    SET reply->qual[x].status = "S"
+    SET reply->qual[x].cdf_meaning = request->qual[x].cdf_meaning
+   ELSE
+    SET reply->qual[x].status = "D"
+    SET reply->qual[x].cdf_meaning = request->qual[x].cdf_meaning
+   ENDIF
+   COMMIT
+ ENDFOR
+ SET reply->status_data.status = "S"
+END GO

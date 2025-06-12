@@ -1,0 +1,84 @@
+CREATE PROGRAM dm_un_obsolete_mmc_tables:dba
+ IF ( NOT (validate(readme_data,0)))
+  FREE SET readme_data
+  RECORD readme_data(
+    1 ocd = i4
+    1 readme_id = f8
+    1 instance = i4
+    1 readme_type = vc
+    1 description = vc
+    1 script = vc
+    1 check_script = vc
+    1 data_file = vc
+    1 par_file = vc
+    1 blocks = i4
+    1 log_rowid = vc
+    1 status = vc
+    1 message = c255
+    1 options = vc
+    1 driver = vc
+    1 batch_dt_tm = dq8
+  )
+ ENDIF
+ SET readme_data->status = "F"
+ SET readme_data->message = "Failed to remove dm_info rows"
+ SET errmsg = fillstring(132," ")
+ DELETE  FROM dm_info d
+  WHERE d.info_domain="OBSOLETE_OBJECT"
+   AND d.info_name IN ("MMC_ACTIVITY_ST", "MMC_CASE_ST", "MMC_PERSON_ST", "XPKMMC_ACTIVITY_ST",
+  "XIE1MMC_ACTIVITY_ST",
+  "XIE2MMC_ACTIVITY_ST", "XIE3MMC_ACTIVITY_ST", "XIE4MMC_ACTIVITY_ST", "XIE5MMC_ACTIVITY_ST",
+  "XIE6MMC_ACTIVITY_ST",
+  "XIE7MMC_ACTIVITY_ST", "XIE8MMC_ACTIVITY_ST", "XPKMMC_CASE_ST", "XIE1MMC_CASE_ST",
+  "XIE2MMC_CASE_ST",
+  "XIE3MMC_CASE_ST", "XIE4MMC_CASE_ST", "XIE5MMC_CASE_ST", "XIE6MMC_CASE_ST", "XIE7MMC_CASE_ST",
+  "XIE8MMC_CASE_ST", "XIE9MMC_CASE_ST", "XIE10MMC_CASE_ST", "XIE11MMC_CASE_ST", "XIE12MMC_CASE_ST",
+  "XIE13MMC_CASE_ST", "XIE14MMC_CASE_ST", "XIE15MMC_CASE_ST", "XIE16MMC_CASE_ST", "XPKMMC_PERSON_ST",
+  "XIE1MMC_PERSON_ST", "XIE2MMC_PERSON_ST", "XIE3MMC_PERSON_ST", "XIE4MMC_PERSON_ST",
+  "XIE5MMC_PERSON_ST",
+  "XIE6MMC_PERSON_ST", "XIE7MMC_PERSON_ST", "XIE8MMC_PERSON_ST", "XIE9MMC_PERSON_ST",
+  "XIE10MMC_PERSON_ST",
+  "XIE11MMC_PERSON_ST", "XIE12MMC_PERSON_ST", "XIE13MMC_PERSON_ST", "XIE14MMC_PERSON_ST",
+  "XIE15MMC_PERSON_ST",
+  "XIE16MMC_PERSON_ST", "XIE17MMC_PERSON_ST")
+  WITH nocounter
+ ;end delete
+ IF (error(errmsg,0) != 0)
+  SET readme_data->message = errmsg
+  GO TO exit_script
+ ELSE
+  COMMIT
+ ENDIF
+ SELECT INTO "NL:"
+  d.info_domain
+  FROM dm_info d
+  WHERE d.info_domain="OBSOLETE_OBJECT"
+   AND d.info_name IN ("MMC_ACTIVITY_ST", "MMC_CASE_ST", "MMC_PERSON_ST", "XPKMMC_ACTIVITY_ST",
+  "XIE1MMC_ACTIVITY_ST",
+  "XIE2MMC_ACTIVITY_ST", "XIE3MMC_ACTIVITY_ST", "XIE4MMC_ACTIVITY_ST", "XIE5MMC_ACTIVITY_ST",
+  "XIE6MMC_ACTIVITY_ST",
+  "XIE7MMC_ACTIVITY_ST", "XIE8MMC_ACTIVITY_ST", "XPKMMC_CASE_ST", "XIE1MMC_CASE_ST",
+  "XIE2MMC_CASE_ST",
+  "XIE3MMC_CASE_ST", "XIE4MMC_CASE_ST", "XIE5MMC_CASE_ST", "XIE6MMC_CASE_ST", "XIE7MMC_CASE_ST",
+  "XIE8MMC_CASE_ST", "XIE9MMC_CASE_ST", "XIE10MMC_CASE_ST", "XIE11MMC_CASE_ST", "XIE12MMC_CASE_ST",
+  "XIE13MMC_CASE_ST", "XIE14MMC_CASE_ST", "XIE15MMC_CASE_ST", "XIE16MMC_CASE_ST", "XPKMMC_PERSON_ST",
+  "XIE1MMC_PERSON_ST", "XIE2MMC_PERSON_ST", "XIE3MMC_PERSON_ST", "XIE4MMC_PERSON_ST",
+  "XIE5MMC_PERSON_ST",
+  "XIE6MMC_PERSON_ST", "XIE7MMC_PERSON_ST", "XIE8MMC_PERSON_ST", "XIE9MMC_PERSON_ST",
+  "XIE10MMC_PERSON_ST",
+  "XIE11MMC_PERSON_ST", "XIE12MMC_PERSON_ST", "XIE13MMC_PERSON_ST", "XIE14MMC_PERSON_ST",
+  "XIE15MMC_PERSON_ST",
+  "XIE16MMC_PERSON_ST", "XIE17MMC_PERSON_ST")
+  WITH nocounter
+ ;end select
+ IF (curqual > 0)
+  GO TO exit_script
+ ELSE
+  SET readme_data->status = "S"
+  SET readme_data->message = "All tables dropped successfully"
+ ENDIF
+#exit_script
+ IF ((readme_data->readme_id > 0))
+  EXECUTE dm_readme_status
+ ENDIF
+END GO

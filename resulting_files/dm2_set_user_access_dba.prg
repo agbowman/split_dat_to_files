@@ -1,0 +1,1340 @@
+CREATE PROGRAM dm2_set_user_access:dba
+ IF ((validate(dcr_max_stack_size,- (1))=- (1))
+  AND (validate(dcr_max_stack_size,- (2))=- (2)))
+  DECLARE dcr_max_stack_size = i4 WITH protect, constant(30)
+ ENDIF
+ IF (validate(dm_err->ecode,- (1)) < 0
+  AND validate(dm_err->ecode,722)=722)
+  FREE RECORD dm_err
+  IF (currev >= 8)
+   RECORD dm_err(
+     1 logfile = vc
+     1 debug_flag = i2
+     1 ecode = i4
+     1 emsg = vc
+     1 eproc = vc
+     1 err_ind = i2
+     1 user_action = vc
+     1 asterisk_line = c80
+     1 tempstr = vc
+     1 errfile = vc
+     1 errtext = vc
+     1 unique_fname = vc
+     1 disp_msg_emsg = vc
+     1 disp_dcl_err_ind = i2
+   )
+  ELSE
+   RECORD dm_err(
+     1 logfile = vc
+     1 debug_flag = i2
+     1 ecode = i4
+     1 emsg = c132
+     1 eproc = vc
+     1 err_ind = i2
+     1 user_action = vc
+     1 asterisk_line = c80
+     1 tempstr = vc
+     1 errfile = vc
+     1 errtext = vc
+     1 unique_fname = vc
+     1 disp_msg_emsg = vc
+     1 disp_dcl_err_ind = i2
+   )
+  ENDIF
+  SET dm_err->asterisk_line = fillstring(80,"*")
+  SET dm_err->ecode = 0
+  IF (validate(dm2_debug_flag,- (1)) > 0)
+   SET dm_err->debug_flag = dm2_debug_flag
+  ELSE
+   SET dm_err->debug_flag = 0
+  ENDIF
+  SET dm_err->err_ind = 0
+  SET dm_err->user_action = "NONE"
+  SET dm_err->tempstr = " "
+  SET dm_err->errfile = "NONE"
+  SET dm_err->logfile = "NONE"
+  SET dm_err->unique_fname = "NONE"
+  SET dm_err->disp_dcl_err_ind = 1
+ ENDIF
+ IF (validate(dm2_sys_misc->cur_os,"X")="X"
+  AND validate(dm2_sys_misc->cur_os,"Y")="Y")
+  FREE RECORD dm2_sys_misc
+  RECORD dm2_sys_misc(
+    1 cur_os = vc
+    1 cur_db_os = vc
+  )
+  SET dm2_sys_misc->cur_os = validate(cursys2,cursys)
+  SET dm2_sys_misc->cur_db_os = validate(currdbsys,cursys)
+  IF (size(dm2_sys_misc->cur_db_os) != 3)
+   SET dm2_sys_misc->cur_db_os = substring(1,(findstring(":",dm2_sys_misc->cur_db_os,1,1) - 1),
+    dm2_sys_misc->cur_db_os)
+  ENDIF
+ ENDIF
+ IF (validate(dm2_install_schema->process_option," ")=" "
+  AND validate(dm2_install_schema->process_option,"NOTTHERE")="NOTTHERE")
+  FREE RECORD dm2_install_schema
+  RECORD dm2_install_schema(
+    1 process_option = vc
+    1 file_prefix = vc
+    1 schema_loc = vc
+    1 schema_prefix = vc
+    1 target_dbase_name = vc
+    1 dbase_name = vc
+    1 u_name = vc
+    1 p_word = vc
+    1 connect_str = vc
+    1 v500_p_word = vc
+    1 v500_connect_str = vc
+    1 cdba_p_word = vc
+    1 cdba_connect_str = vc
+    1 run_id = i4
+    1 menu_driver = vc
+    1 oragen3_ignore_dm_columns_doc = i2
+    1 last_checkpoint = vc
+    1 gen_id = i4
+    1 restart_method = i2
+    1 appl_id = vc
+    1 hostname = vc
+    1 ccluserdir = vc
+    1 cer_install = vc
+    1 servername = vc
+    1 frmt_servername = vc
+    1 default_fg_name = vc
+    1 curprog = vc
+    1 adl_username = vc
+    1 tgt_sch_cleanup = i2
+    1 special_ih_process = i2
+    1 dbase_type = vc
+    1 data_to_move = c30
+    1 percent_tspace = i4
+    1 src_dbase_name = vc
+    1 src_v500_p_word = vc
+    1 src_v500_connect_str = vc
+    1 logfile_prefix = vc
+    1 src_run_id = f8
+    1 src_op_id = f8
+    1 target_env_name = vc
+    1 dm2_updt_task_value = i2
+  )
+  SET dm2_install_schema->process_option = "NONE"
+  SET dm2_install_schema->file_prefix = "NONE"
+  SET dm2_install_schema->schema_loc = "NONE"
+  SET dm2_install_schema->schema_prefix = "NONE"
+  SET dm2_install_schema->target_dbase_name = "NONE"
+  SET dm2_install_schema->dbase_name = "NONE"
+  SET dm2_install_schema->u_name = "NONE"
+  SET dm2_install_schema->p_word = "NONE"
+  SET dm2_install_schema->connect_str = "NONE"
+  SET dm2_install_schema->v500_p_word = "NONE"
+  SET dm2_install_schema->v500_connect_str = "NONE"
+  SET dm2_install_schema->cdba_p_word = "NONE"
+  SET dm2_install_schema->cdba_connect_str = "NONE"
+  SET dm2_install_schema->run_id = 0
+  SET dm2_install_schema->menu_driver = "NONE"
+  SET dm2_install_schema->oragen3_ignore_dm_columns_doc = 0
+  SET dm2_install_schema->last_checkpoint = "NONE"
+  SET dm2_install_schema->gen_id = 0
+  SET dm2_install_schema->restart_method = 0
+  SET dm2_install_schema->appl_id = "NONE"
+  SET dm2_install_schema->hostname = "NONE"
+  SET dm2_install_schema->servername = "NONE"
+  SET dm2_install_schema->default_fg_name = "NONE"
+  SET dm2_install_schema->curprog = "NONE"
+  SET dm2_install_schema->adl_username = "NONE"
+  SET dm2_install_schema->tgt_sch_cleanup = 0
+  SET dm2_install_schema->special_ih_process = 0
+  SET dm2_install_schema->dbase_type = "NONE"
+  SET dm2_install_schema->data_to_move = "NONE"
+  SET dm2_install_schema->percent_tspace = 0
+  SET dm2_install_schema->src_dbase_name = "NONE"
+  SET dm2_install_schema->src_v500_p_word = "NONE"
+  SET dm2_install_schema->src_v500_connect_str = "NONE"
+  SET dm2_install_schema->logfile_prefix = "NONE"
+  SET dm2_install_schema->src_run_id = 0
+  SET dm2_install_schema->src_op_id = 0
+  SET dm2_install_schema->target_env_name = "NONE"
+  SET dm2_install_schema->dm2_updt_task_value = 15301
+  IF ((dm2_sys_misc->cur_os="WIN"))
+   SET dm2_install_schema->ccluserdir = build(logical("ccluserdir"),"\")
+   SET dm2_install_schema->cer_install = build(logical("cer_install"),"\")
+  ELSEIF ((dm2_sys_misc->cur_os="AXP"))
+   SET dm2_install_schema->ccluserdir = logical("ccluserdir")
+   SET dm2_install_schema->cer_install = logical("cer_install")
+  ELSE
+   SET dm2_install_schema->ccluserdir = build(logical("ccluserdir"),"/")
+   SET dm2_install_schema->cer_install = build(logical("cer_install"),"/")
+  ENDIF
+ ENDIF
+ IF (validate(inhouse_misc->inhouse_domain,- (1)) < 0
+  AND validate(inhouse_misc->inhouse_domain,722)=722)
+  FREE RECORD inhouse_misc
+  RECORD inhouse_misc(
+    1 inhouse_domain = i2
+    1 fk_err_ind = i2
+    1 nonfk_err_ind = i2
+    1 fk_parent_table = vc
+    1 tablespace_err_code = f8
+    1 foreignkey_err_code = f8
+  )
+  SET inhouse_misc->inhouse_domain = - (1)
+  SET inhouse_misc->fk_err_ind = 0
+  SET inhouse_misc->nonfk_err_ind = 0
+  SET inhouse_misc->fk_parent_table = ""
+  SET inhouse_misc->tablespace_err_code = 93
+  SET inhouse_misc->foreignkey_err_code = 94
+ ENDIF
+ IF (validate(program_stack_rs->cnt,1)=1
+  AND validate(program_stack_rs->cnt,2)=2)
+  FREE RECORD program_stack_rs
+  RECORD program_stack_rs(
+    1 cnt = i4
+    1 qual[*]
+      2 name = vc
+  )
+  SET stat = alterlist(program_stack_rs->qual,dcr_max_stack_size)
+ ENDIF
+ DECLARE dm2_push_cmd(sbr_dpcstr=vc,sbr_cmd_end=i2) = i2
+ DECLARE dm2_push_dcl(sbr_dpdstr=vc) = i2
+ DECLARE get_unique_file(sbr_fprefix=vc,sbr_fext=vc) = i2
+ DECLARE parse_errfile(sbr_errfile=vc) = i2
+ DECLARE check_error(sbr_ceprocess=vc) = i2
+ DECLARE disp_msg(sbr_demsg=vc,sbr_dlogfile=vc,sbr_derr_ind=i2) = null
+ DECLARE init_logfile(sbr_logfile=vc,sbr_header_msg=vc) = i2
+ DECLARE check_logfile(sbr_lprefix=vc,sbr_lext=vc,sbr_hmsg=vc) = i2
+ DECLARE final_disp_msg(sbr_log_prefix=vc) = null
+ DECLARE dm2_set_autocommit(sbr_dsa_flag=i2) = i2
+ DECLARE dm2_prg_maint(sbr_maint_type=vc) = i2
+ DECLARE dm2_set_inhouse_domain() = i2
+ DECLARE dm2_table_exists(dte_table_name=vc) = c1
+ DECLARE dm2_table_and_ccldef_exists(dtace_table_name=vc,dtace_found_ind=i2(ref)) = i2
+ DECLARE dm2_table_column_exists(dtce_owner=vc,dtce_table_name=vc,dtce_column_name=vc,
+  dtce_col_chk_ind=i2,dtce_coldef_chk_ind=i2,
+  dtce_ccldef_mode=i2,dtce_col_fnd_ind=i2(ref),dtce_coldef_fnd_ind=i2(ref),dtce_data_type=vc(ref)) =
+ i2
+ DECLARE dm2_disp_file(ddf_fname=vc,ddf_desc=vc) = i2
+ DECLARE dm2_get_program_stack(null) = vc
+ SUBROUTINE dm2_push_cmd(sbr_dpcstr,sbr_cmd_end)
+   IF ((dm_err->debug_flag > 0))
+    CALL echo("*")
+    CALL echo(concat("dm2_push_cmd executing: ",sbr_dpcstr))
+    CALL echo("*")
+   ENDIF
+   CALL parser(sbr_dpcstr,1)
+   SET dm_err->tempstr = concat(dm_err->tempstr," ",sbr_dpcstr)
+   IF (sbr_cmd_end=1)
+    IF ((dm_err->err_ind=0))
+     IF (check_error(concat("dm2_push_cmd executing: ",dm_err->tempstr))=1)
+      CALL disp_msg(dm_err->emsg,dm_err->logfile,1)
+      SET dm_err->tempstr = " "
+      RETURN(0)
+     ENDIF
+    ENDIF
+    SET dm_err->tempstr = " "
+   ENDIF
+   RETURN(1)
+ END ;Subroutine
+ SUBROUTINE dm2_push_dcl(sbr_dpdstr)
+   DECLARE dpd_stat = i4 WITH protect, noconstant(0)
+   DECLARE newstr = vc WITH protect
+   DECLARE strloc = i4 WITH protect, noconstant(0)
+   DECLARE temp_file = vc WITH protect, noconstant(" ")
+   DECLARE str2 = vc WITH protect, noconstant(" ")
+   DECLARE posx = i4 WITH protect, noconstant(0)
+   DECLARE sql_warn_ind = i2 WITH protect, noconstant(0)
+   DECLARE dpd_disp_dcl_err_ind = i2 WITH protect, noconstant(1)
+   IF ((validate(dm_err->disp_dcl_err_ind,- (1))=- (1))
+    AND (validate(dm_err->disp_dcl_err_ind,- (2))=- (2)))
+    SET dpd_disp_dcl_err_ind = 1
+   ELSE
+    SET dpd_disp_dcl_err_ind = dm_err->disp_dcl_err_ind
+    SET dm_err->disp_dcl_err_ind = 1
+   ENDIF
+   IF ((dm_err->errfile="NONE"))
+    IF (get_unique_file("dm2_",".err")=0)
+     RETURN(0)
+    ELSE
+     SET dm_err->errfile = dm_err->unique_fname
+    ENDIF
+   ENDIF
+   IF ((dm2_sys_misc->cur_os IN ("AXP")))
+    SET strloc = findstring(">",sbr_dpdstr,1,0)
+    IF (strloc > 0)
+     SET dm_err->err_ind = 1
+     SET dm_err->emsg = "Cannot support additional piping outside of push dcl subroutine"
+     SET dm_err->eproc = "Check push dcl command for piping character (>)."
+     RETURN(0)
+    ENDIF
+    SET newstr = concat("pipe ",sbr_dpdstr," > ccluserdir:",dm_err->errfile)
+   ELSE
+    SET strloc = findstring(">",sbr_dpdstr,1,0)
+    IF (strloc > 0)
+     SET strlength = size(trim(sbr_dpdstr))
+     IF (findstring("2>&1",sbr_dpdstr) > 0)
+      SET temp_file = build(substring((strloc+ 1),((strlength - strloc) - 4),sbr_dpdstr))
+     ELSE
+      SET temp_file = build(substring((strloc+ 1),(strlength - strloc),sbr_dpdstr))
+     ENDIF
+     SET newstr = sbr_dpdstr
+    ELSE
+     SET newstr = concat(sbr_dpdstr," > ",dm2_install_schema->ccluserdir,dm_err->errfile," 2>&1")
+    ENDIF
+   ENDIF
+   IF ((dm_err->debug_flag > 0))
+    CALL echo("*")
+    CALL echo(concat("dm2_push_dcl executing: ",newstr))
+    CALL echo("*")
+   ENDIF
+   CALL dcl(newstr,size(newstr),dpd_stat)
+   IF (dpd_stat=0)
+    IF (temp_file > " ")
+     CASE (dm2_sys_misc->cur_os)
+      OF "WIN":
+       SET str2 = concat("copy ",temp_file," ",dm_err->errfile)
+      ELSE
+       IF ((dm2_sys_misc->cur_os != "AXP"))
+        SET str2 = concat("cp ",temp_file," ",dm_err->errfile)
+       ENDIF
+     ENDCASE
+     CALL dcl(str2,size(str2),dpd_stat)
+    ENDIF
+    IF (parse_errfile(dm_err->errfile)=0)
+     RETURN(0)
+    ENDIF
+    IF (sql_warn_ind=true)
+     SET dm_err->user_action = "NONE"
+     SET dm_err->eproc = concat("Warning Encountered:",dm_err->errtext)
+     CALL disp_msg("",dm_err->logfile,0)
+    ELSE
+     SET dm_err->disp_msg_emsg = dm_err->errtext
+     SET dm_err->emsg = dm_err->disp_msg_emsg
+     IF (dpd_disp_dcl_err_ind=1)
+      SET dm_err->eproc = concat("dm2_push_dcl executing: ",newstr)
+      SET dm_err->err_ind = 1
+      CALL disp_msg("dm_err->disp_msg_emsg",dm_err->logfile,1)
+     ELSE
+      IF ((dm_err->debug_flag > 1))
+       CALL echo("Call dcl failed- error handling done by calling script")
+      ENDIF
+     ENDIF
+     RETURN(0)
+    ENDIF
+   ENDIF
+   IF ((dm_err->debug_flag > 2))
+    CALL echo(concat("PARSING THROUGH - ",dm_err->errfile))
+    IF (parse_errfile(dm_err->errfile)=0)
+     RETURN(0)
+    ENDIF
+   ENDIF
+   RETURN(1)
+ END ;Subroutine
+ SUBROUTINE get_unique_file(sbr_fprefix,sbr_fext)
+   DECLARE guf_return_val = i4 WITH protect, noconstant(1)
+   DECLARE fini = i2 WITH protect, noconstant(0)
+   DECLARE fname = vc WITH protect
+   DECLARE unique_tempstr = vc WITH protect
+   WHILE (fini=0)
+     IF ((((validate(systimestamp,- (999.00))=- (999.00))
+      AND validate(systimestamp,999.00)=999.00) OR (validate(dm2_bypass_unique_file,- (1))=1)) )
+      SET unique_tempstr = substring(1,6,cnvtstring((datetimediff(cnvtdatetime(curdate,curtime3),
+         cnvtdatetime(curdate,000000)) * 864000)))
+     ELSEIF ((validate(systimestamp,- (999.00)) != - (999.00))
+      AND validate(systimestamp,999.00) != 999.00
+      AND (validate(dm2_bypass_unique_file,- (1))=- (1))
+      AND (validate(dm2_bypass_unique_file,- (2))=- (2)))
+      SET unique_tempstr = format(systimestamp,"hhmmsscccccc;;q")
+     ENDIF
+     SET fname = cnvtlower(build(sbr_fprefix,unique_tempstr,sbr_fext))
+     IF (findfile(fname)=0)
+      SET fini = 1
+     ENDIF
+   ENDWHILE
+   IF (check_error(concat("Getting unique file name using prefix: ",sbr_fprefix," and ext: ",sbr_fext
+     ))=1)
+    SET guf_return_val = 0
+   ENDIF
+   IF (guf_return_val=0)
+    CALL echo("*")
+    CALL echo("*")
+    CALL echo("*")
+    CALL echo(dm_err->asterisk_line)
+    CALL echo("*")
+    CALL echo(concat("Error occurred in ",dm_err->eproc))
+    CALL echo("*")
+    CALL echo(trim(dm_err->emsg))
+    CALL echo("*")
+    IF ((dm_err->user_action != "NONE"))
+     CALL echo(dm_err->user_action)
+     CALL echo("*")
+    ENDIF
+    CALL echo(dm_err->asterisk_line)
+    CALL echo("*")
+    CALL echo("*")
+    CALL echo("*")
+   ELSE
+    SET dm_err->unique_fname = fname
+    CALL echo(concat("**Unique filename = ",dm_err->unique_fname))
+   ENDIF
+   RETURN(guf_return_val)
+ END ;Subroutine
+ SUBROUTINE parse_errfile(sbr_errfile)
+   SET dm_err->errtext = " "
+   FREE DEFINE rtl2
+   FREE SET file_loc
+   SET logical file_loc value(sbr_errfile)
+   DEFINE rtl2 "file_loc"
+   SELECT INTO "nl:"
+    r.line
+    FROM rtl2t r
+    DETAIL
+     IF ((dm_err->debug_flag > 1))
+      CALL echo(concat("TEXT = ",r.line))
+     ENDIF
+     dm_err->errtext = build(dm_err->errtext,r.line)
+    WITH nocounter, maxcol = 255
+   ;end select
+   IF (check_error(concat("Parsing error file ",dm_err->errfile))=1)
+    CALL disp_msg(dm_err->emsg,dm_err->logfile,1)
+    RETURN(0)
+   ENDIF
+   RETURN(1)
+ END ;Subroutine
+ SUBROUTINE check_error(sbr_ceprocess)
+   DECLARE return_val = i4 WITH protect, noconstant(0)
+   IF ((dm_err->err_ind=1))
+    SET return_val = 1
+   ELSE
+    SET dm_err->ecode = error(dm_err->emsg,1)
+    IF ((dm_err->ecode != 0))
+     SET dm_err->eproc = sbr_ceprocess
+     SET dm_err->err_ind = 1
+     SET return_val = 1
+    ENDIF
+   ENDIF
+   RETURN(return_val)
+ END ;Subroutine
+ SUBROUTINE disp_msg(sbr_demsg,sbr_dlogfile,sbr_derr_ind)
+   DECLARE dm_txt = c132 WITH protect
+   DECLARE dm_ecode = i4 WITH protect
+   DECLARE dm_emsg = c132 WITH protect
+   DECLARE dm_full_emsg = vc WITH protect
+   DECLARE dm_eproc_length = i4 WITH protect
+   DECLARE dm_full_emsg_length = i4 WITH protect
+   DECLARE dm_user_action_length = i4 WITH protect
+   IF (sbr_demsg="dm_err->disp_msg_emsg")
+    SET dm_full_emsg = dm_err->disp_msg_emsg
+   ELSE
+    SET dm_full_emsg = sbr_demsg
+   ENDIF
+   SET dm_eproc_length = textlen(dm_err->eproc)
+   SET dm_full_emsg_length = textlen(dm_full_emsg)
+   SET dm_user_action_length = textlen(dm_err->user_action)
+   IF ( NOT (sbr_dlogfile IN ("NONE", "DM2_LOGFILE_NOTSET"))
+    AND trim(sbr_dlogfile) != ""
+    AND sbr_derr_ind IN (0, 1, 10))
+    SELECT INTO value(sbr_dlogfile)
+     FROM (dummyt d  WITH seq = 1)
+     HEAD REPORT
+      beg_pos = 1, end_pos = 132, not_done = 1
+     DETAIL
+      row + 1, curdate"mm/dd/yyyy;;d", " ",
+      curtime3"hh:mm:ss;3;m"
+      IF (sbr_derr_ind=1)
+       row + 1, "* Component Name:  ", curprog,
+       row + 1, "* Process Description:  "
+      ENDIF
+      dm_txt = substring(beg_pos,end_pos,dm_err->eproc)
+      WHILE (not_done=1)
+        row + 1, col 0, dm_txt
+        IF (end_pos > dm_eproc_length)
+         not_done = 0
+        ELSE
+         beg_pos = (end_pos+ 1), end_pos = (end_pos+ 132), dm_txt = substring(beg_pos,132,dm_err->
+          eproc)
+        ENDIF
+      ENDWHILE
+      IF (sbr_derr_ind=1)
+       row + 1, "* Error Message:  ", beg_pos = 1,
+       end_pos = 132, dm_txt = substring(beg_pos,132,dm_full_emsg), not_done = 1
+       WHILE (not_done=1)
+         row + 1, col 0, dm_txt
+         IF (end_pos > dm_full_emsg_length)
+          not_done = 0
+         ELSE
+          beg_pos = (end_pos+ 1), end_pos = (end_pos+ 132), dm_txt = substring(beg_pos,132,
+           dm_full_emsg)
+         ENDIF
+       ENDWHILE
+      ENDIF
+      IF ((dm_err->user_action != "NONE"))
+       row + 1, "* Recommended Action(s):  ", beg_pos = 1,
+       end_pos = 132, dm_txt = substring(beg_pos,132,dm_err->user_action), not_done = 1
+       WHILE (not_done=1)
+         row + 1, col 0, dm_txt
+         IF (end_pos > dm_user_action_length)
+          not_done = 0
+         ELSE
+          beg_pos = (end_pos+ 1), end_pos = (end_pos+ 132), dm_txt = substring(beg_pos,132,dm_err->
+           user_action)
+         ENDIF
+       ENDWHILE
+      ENDIF
+      row + 1
+     WITH nocounter, format = variable, formfeed = none,
+      maxrow = 1, maxcol = 200, append
+    ;end select
+    SET dm_ecode = error(dm_emsg,1)
+   ELSEIF (sbr_dlogfile != "DM2_LOGFILE_NOTSET")
+    SET dm_ecode = 1
+    SET dm_emsg = "Message couldn't write to log file since name passed in was invalid."
+   ENDIF
+   IF (dm_ecode > 0)
+    CALL echo("*")
+    CALL echo("*")
+    CALL echo("*")
+    CALL echo(dm_err->asterisk_line)
+    CALL echo("*")
+    CALL echo(concat("Component Name:  ",curprog))
+    CALL echo("*")
+    CALL echo(concat("Process Description:  Writing message to log file."))
+    CALL echo("*")
+    CALL echo(concat("Error Message:  ",trim(dm_emsg)))
+    CALL echo("*")
+    IF ( NOT (sbr_dlogfile IN ("NONE", "DM2_LOGFILE_NOTSET")))
+     CALL echo(concat("Log file is ccluserdir:",sbr_dlogfile))
+     CALL echo("*")
+    ENDIF
+    CALL echo(dm_err->asterisk_line)
+    CALL echo("*")
+    CALL echo("*")
+    CALL echo("*")
+   ENDIF
+   IF (sbr_derr_ind=1)
+    CALL echo("*")
+    CALL echo("*")
+    CALL echo("*")
+    CALL echo(dm_err->asterisk_line)
+    CALL echo("*")
+    CALL echo(concat("Component Name:  ",curprog))
+    CALL echo("*")
+    CALL echo(concat("Process Description:  ",dm_err->eproc))
+    CALL echo("*")
+    CALL echo(concat("Error Message:  ",trim(dm_full_emsg)))
+    CALL echo("*")
+    IF ((dm_err->user_action != "NONE"))
+     CALL echo(concat("Recommended Action(s):  ",trim(dm_err->user_action)))
+     CALL echo("*")
+    ENDIF
+    IF ( NOT (sbr_dlogfile IN ("NONE", "DM2_LOGFILE_NOTSET")))
+     CALL echo(concat("Log file is ccluserdir:",sbr_dlogfile))
+     CALL echo("*")
+    ENDIF
+    CALL echo(dm_err->asterisk_line)
+    CALL echo("*")
+    CALL echo("*")
+    CALL echo("*")
+   ELSEIF (sbr_derr_ind IN (0, 20))
+    CALL echo("*")
+    CALL echo("*")
+    CALL echo("*")
+    CALL echo(dm_err->asterisk_line)
+    CALL echo("*")
+    CALL echo(dm_err->eproc)
+    CALL echo("*")
+    IF ((dm_err->user_action != "NONE"))
+     CALL echo(concat("Recommended Action(s):  ",trim(dm_err->user_action)))
+     CALL echo("*")
+    ENDIF
+    CALL echo(dm_err->asterisk_line)
+    CALL echo("*")
+    CALL echo("*")
+    CALL echo("*")
+   ENDIF
+   SET dm_err->user_action = "NONE"
+ END ;Subroutine
+ SUBROUTINE init_logfile(sbr_logfile,sbr_header_msg)
+   DECLARE init_return_val = i4 WITH protect, noconstant(1)
+   IF (sbr_logfile != "NONE"
+    AND trim(sbr_logfile) != "")
+    SELECT INTO value(sbr_logfile)
+     FROM (dummyt d  WITH seq = 1)
+     DETAIL
+      row + 1, curdate"mm/dd/yyyy;;d", " ",
+      curtime3"hh:mm:ss;;m", row + 1, sbr_header_msg,
+      row + 1, row + 1
+     WITH nocounter, format = variable, formfeed = none,
+      maxrow = 1, maxcol = 512
+    ;end select
+    IF (check_error(concat("Creating log file ",trim(sbr_logfile)))=1)
+     SET init_return_val = 0
+    ELSE
+     SET dm_err->eproc = concat("Log file created.  Log file name is: ",sbr_logfile)
+     CALL disp_msg(" ",sbr_logfile,0)
+    ENDIF
+   ELSE
+    SET dm_err->err_ind = 1
+    SET dm_err->eproc = concat("Creating log file ",trim(sbr_logfile))
+    SET dm_err->emsg = concat("Log file name passed is invalid.  Name passed in is: ",trim(
+      sbr_logfile))
+    SET init_return_val = 0
+   ENDIF
+   IF (init_return_val=0)
+    CALL echo("*")
+    CALL echo("*")
+    CALL echo("*")
+    CALL echo(dm_err->asterisk_line)
+    CALL echo("*")
+    CALL echo(concat("Error occurred in ",dm_err->eproc))
+    CALL echo("*")
+    CALL echo(trim(dm_err->emsg))
+    CALL echo("*")
+    CALL echo(dm_err->asterisk_line)
+    CALL echo("*")
+    CALL echo("*")
+    CALL echo("*")
+   ENDIF
+   RETURN(init_return_val)
+ END ;Subroutine
+ SUBROUTINE check_logfile(sbr_lprefix,sbr_lext,sbr_hmsg)
+   IF ((dm_err->logfile IN ("NONE", "DM2_LOGFILE_NOTSET")))
+    IF ((dm_err->debug_flag > 9))
+     SET trace = echoprogsub
+     IF (((currev > 8) OR (currev=8
+      AND currevminor >= 1)) )
+      SET trace = echosub
+     ENDIF
+    ENDIF
+    IF (get_unique_file(sbr_lprefix,sbr_lext)=0)
+     RETURN(0)
+    ENDIF
+    SET dm_err->logfile = dm_err->unique_fname
+    IF (init_logfile(dm_err->logfile,sbr_hmsg)=0)
+     RETURN(0)
+    ENDIF
+   ENDIF
+   IF (dm2_prg_maint("BEGIN")=0)
+    RETURN(0)
+   ENDIF
+   RETURN(1)
+ END ;Subroutine
+ SUBROUTINE final_disp_msg(sbr_log_prefix)
+   DECLARE plength = i2
+   SET plength = textlen(sbr_log_prefix)
+   IF (dm2_prg_maint("END")=0)
+    RETURN(0)
+   ENDIF
+   IF ((dm_err->err_ind=0))
+    IF (cnvtlower(sbr_log_prefix)=substring(1,plength,dm_err->logfile))
+     SET dm_err->eproc = concat(dm_err->eproc,"  Log file is ccluserdir:",dm_err->logfile)
+     CALL disp_msg(" ",dm_err->logfile,0)
+    ELSE
+     CALL disp_msg(" ",dm_err->logfile,0)
+    ENDIF
+   ENDIF
+ END ;Subroutine
+ SUBROUTINE dm2_set_autocommit(sbr_dsa_flag)
+   RETURN(1)
+ END ;Subroutine
+ SUBROUTINE dm2_prg_maint(sbr_maint_type)
+   IF ( NOT (cnvtupper(trim(sbr_maint_type,3)) IN ("BEGIN", "END")))
+    SET dm_err->err_ind = 1
+    SET dm_err->emsg = "Invalid maintenance type"
+    SET dm_err->eproc = "Performing program maintenance"
+    CALL disp_msg(dm_err->emsg,dm_err->logfile,dm_err->err_ind)
+    RETURN(0)
+   ENDIF
+   IF ((dm_err->debug_flag > 1))
+    CALL echo("********************************************************")
+    CALL echo("* CCL current resource usage statistics                *")
+    CALL echo("********************************************************")
+    CALL trace(7)
+   ENDIF
+   IF (cnvtupper(trim(sbr_maint_type,3))="BEGIN")
+    IF ((program_stack_rs->cnt < dcr_max_stack_size))
+     SET program_stack_rs->cnt = (program_stack_rs->cnt+ 1)
+     SET program_stack_rs->qual[program_stack_rs->cnt].name = curprog
+    ENDIF
+    SET dm_err->ecode = error(dm_err->emsg,1)
+    IF (dm2_set_autocommit(0)=0)
+     RETURN(0)
+    ENDIF
+    SET dm2_install_schema->curprog = curprog
+   ELSE
+    FOR (i = 0 TO (program_stack_rs->cnt - 1))
+      IF ((program_stack_rs->qual[(program_stack_rs->cnt - i)].name=curprog))
+       FOR (j = (program_stack_rs->cnt - i) TO program_stack_rs->cnt)
+         SET program_stack_rs->qual[j].name = ""
+       ENDFOR
+       SET program_stack_rs->cnt = ((program_stack_rs->cnt - i) - 1)
+       SET i = program_stack_rs->cnt
+      ENDIF
+    ENDFOR
+    IF (dm2_set_autocommit(0)=0)
+     RETURN(0)
+    ENDIF
+   ENDIF
+   IF ((dm_err->debug_flag > 0))
+    CALL echo(dm2_get_program_stack(null))
+   ENDIF
+   RETURN(1)
+ END ;Subroutine
+ SUBROUTINE dm2_set_inhouse_domain(null)
+   DECLARE dsid_tbl_ind = c1 WITH protect, noconstant(" ")
+   IF (validate(dm2_inhouse_flag,- (1)) > 0)
+    SET dm_err->eproc = "Inhouse Domain Detected."
+    CALL disp_msg(" ",dm_err->logfile,0)
+    SET inhouse_misc->inhouse_domain = 1
+    RETURN(1)
+   ENDIF
+   IF ((inhouse_misc->inhouse_domain=- (1)))
+    SET dm_err->eproc = "Determining whether table dm_info exists"
+    SET dsid_tbl_ind = dm2_table_exists("DM_INFO")
+    IF ((dm_err->err_ind=1))
+     RETURN(0)
+    ENDIF
+    IF (dsid_tbl_ind="F")
+     SELECT INTO "nl:"
+      FROM dm_info di
+      WHERE di.info_domain="DATA MANAGEMENT"
+       AND di.info_name="INHOUSE DOMAIN"
+      WITH nocounter
+     ;end select
+     IF (check_error("Determine if process running in an in-house domain")=1)
+      CALL disp_msg(dm_err->emsg,dm_err->logfile,1)
+      RETURN(0)
+     ELSEIF (curqual=1)
+      SET inhouse_misc->inhouse_domain = 1
+     ELSE
+      SET inhouse_misc->inhouse_domain = 0
+     ENDIF
+    ENDIF
+   ELSE
+    RETURN(1)
+   ENDIF
+   RETURN(1)
+ END ;Subroutine
+ SUBROUTINE dm2_table_exists(dte_table_name)
+  SELECT INTO "nl:"
+   FROM dm2_dba_tab_columns dutc
+   WHERE dutc.table_name=trim(cnvtupper(dte_table_name))
+    AND dutc.owner=value(currdbuser)
+   WITH nocounter
+  ;end select
+  IF (check_error(dm_err->eproc)=1)
+   CALL disp_msg(dm_err->emsg,dm_err->logfile,1)
+   RETURN("E")
+  ELSE
+   IF (curqual > 0
+    AND checkdic(cnvtupper(dte_table_name),"T",0)=2)
+    RETURN("F")
+   ELSE
+    RETURN("N")
+   ENDIF
+  ENDIF
+ END ;Subroutine
+ SUBROUTINE dm2_table_and_ccldef_exists(dtace_table_name,dtace_found_ind)
+   SET dtace_found_ind = 0
+   SELECT INTO "nl:"
+    FROM dba_tab_cols dtc
+    WHERE dtc.table_name=trim(cnvtupper(dtace_table_name))
+     AND dtc.owner=value(currdbuser)
+    WITH nocounter
+   ;end select
+   IF (check_error(concat("Checking if ",trim(cnvtupper(dtace_table_name)),
+     " table and ccl def exists"))=1)
+    CALL disp_msg(dm_err->emsg,dm_err->logfile,1)
+    RETURN(0)
+   ELSE
+    IF (curqual > 0
+     AND checkdic(cnvtupper(dtace_table_name),"T",0)=2)
+     SET dtace_found_ind = 1
+    ENDIF
+   ENDIF
+   RETURN(1)
+ END ;Subroutine
+ SUBROUTINE dm2_table_column_exists(dtce_owner,dtce_table_name,dtce_column_name,dtce_col_chk_ind,
+  dtce_coldef_chk_ind,dtce_ccldef_mode,dtce_col_fnd_ind,dtce_coldef_fnd_ind,dtce_data_type)
+   DECLARE dtce_type = vc WITH protect, noconstant("")
+   DECLARE dtce_len = i4 WITH protect, noconstant(0)
+   SET dtce_col_fnd_ind = 0
+   SET dtce_coldef_fnd_ind = 0
+   SET dtce_data_type = ""
+   IF (dtce_col_chk_ind=1)
+    SELECT INTO "nl:"
+     FROM dba_tab_cols dtc
+     WHERE dtc.owner=trim(dtce_owner)
+      AND dtc.table_name=trim(dtce_table_name)
+      AND dtc.column_name=trim(dtce_column_name)
+     WITH nocounter
+    ;end select
+    IF (check_error(concat("Checking if ",trim(dtce_owner),".",trim(dtce_table_name),".",
+      trim(dtce_column_name)," exists"))=1)
+     CALL disp_msg(dm_err->emsg,dm_err->logfile,1)
+     RETURN(0)
+    ELSE
+     IF (curqual > 0)
+      SET dtce_col_fnd_ind = 1
+     ENDIF
+    ENDIF
+   ENDIF
+   IF (dtce_coldef_chk_ind=1)
+    IF (checkdic(cnvtupper(concat(dtce_table_name,".",dtce_column_name)),"A",0)=2)
+     SET dtce_coldef_fnd_ind = 1
+     IF (dtce_ccldef_mode=2)
+      IF (((currev=8
+       AND ((((currev * 10000)+ (currevminor * 100))+ currevminor2) >= 81401)) OR (currev > 8
+       AND ((((currev * 10000)+ (currevminor * 100))+ currevminor2) >= 90201))) )
+       CALL parser(concat(" set dtce_data_type = reflect(",dtce_table_name,".",dtce_column_name,
+         ",1) go "),1)
+       CALL parser(concat(" free range ",dtce_table_name," go "),1)
+       SET dtce_len = cnvtint(cnvtalphanum(dtce_data_type,1))
+       SET dtce_type = cnvtalphanum(dtce_data_type,2)
+       IF (textlen(dtce_type)=2)
+        SET dtce_type = substring(2,2,dtce_type)
+       ENDIF
+       SET dtce_data_type = concat(dtce_type,trim(cnvtstring(dtce_len)))
+      ELSE
+       SELECT INTO "nl:"
+        FROM dtable t,
+         dtableattr ta,
+         dtableattrl tl
+        WHERE t.table_name=cnvtupper(dtce_table_name)
+         AND t.table_name=ta.table_name
+         AND tl.attr_name=cnvtupper(dtce_column_name)
+         AND tl.structtype="F"
+         AND btest(tl.stat,11)=0
+        DETAIL
+         dtce_data_type = concat(tl.type,trim(cnvtstring(tl.len)))
+        WITH nocounter
+       ;end select
+       IF (check_error(concat("Retrieving",trim(dtce_table_name),".",trim(dtce_column_name),
+         " data type"))=1)
+        CALL disp_msg(dm_err->emsg,dm_err->logfile,1)
+        RETURN(0)
+       ENDIF
+      ENDIF
+     ENDIF
+    ENDIF
+   ENDIF
+   RETURN(1)
+ END ;Subroutine
+ SUBROUTINE dm2_disp_file(ddf_fname,ddf_desc)
+   DECLARE ddf_row = i4 WITH protect, noconstant(0)
+   IF ((dm2_sys_misc->cur_os="WIN"))
+    SET message = window
+    SET width = 132
+    CALL clear(1,1)
+    CALL video(n)
+    SET ddf_row = 3
+    CALL box(1,1,5,132)
+    CALL text(ddf_row,48,"***  REPORT GENERATED  ***")
+    SET ddf_row = (ddf_row+ 4)
+    CALL text(ddf_row,2,"The following report was generated in CCLUSERDIR... ")
+    SET ddf_row = (ddf_row+ 2)
+    CALL text(ddf_row,5,concat("File Name:   ",trim(ddf_fname)))
+    SET ddf_row = (ddf_row+ 1)
+    CALL text(ddf_row,5,concat("Description: ",trim(ddf_desc)))
+    SET ddf_row = (ddf_row+ 2)
+    CALL text(ddf_row,2,"Review report in CCLUSERDIR before continuing.")
+    SET ddf_row = (ddf_row+ 2)
+    CALL text(ddf_row,2,"Enter 'C' to continue or 'Q' to quit:  ")
+    CALL accept(ddf_row,41,"A;cu","C"
+     WHERE curaccept IN ("C", "Q"))
+    IF (curaccept="Q")
+     CALL clear(1,1)
+     SET message = nowindow
+     SET dm_err->emsg = "User elected to quit from report prompt."
+     SET dm_err->err_ind = 1
+     CALL disp_msg(dm_err->emsg,dm_err->logfile,1)
+     RETURN(0)
+    ENDIF
+    CALL clear(1,1)
+    SET message = nowindow
+   ELSE
+    SET dm_err->eproc = concat("Displaying ",ddf_desc)
+    IF ((dm_err->debug_flag > 0))
+     CALL disp_msg(" ",dm_err->logfile,0)
+    ENDIF
+    FREE SET file_loc
+    SET logical file_loc value(ddf_fname)
+    FREE DEFINE rtl2
+    DEFINE rtl2 "file_loc"
+    SELECT INTO mine
+     t.line
+     FROM rtl2t t
+     HEAD REPORT
+      col 30,
+      CALL print(ddf_desc), row + 1
+     DETAIL
+      col 0, t.line, row + 1
+     FOOT REPORT
+      row + 0
+     WITH nocounter, maxcol = 5000
+    ;end select
+    IF (check_error(dm_err->eproc)=1)
+     CALL disp_msg(dm_err->emsg,dm_err->logfile,1)
+     RETURN(0)
+    ENDIF
+    FREE DEFINE rtl2
+    FREE SET file_loc
+   ENDIF
+   RETURN(1)
+ END ;Subroutine
+ SUBROUTINE dm2_get_program_stack(null)
+   DECLARE stack = vc WITH protect, noconstant("PROGRAM STACK:")
+   FOR (i = 1 TO (program_stack_rs->cnt - 1))
+     SET stack = build(stack,program_stack_rs->qual[i].name,"->")
+   ENDFOR
+   IF (program_stack_rs->cnt)
+    RETURN(build(stack,program_stack_rs->qual[program_stack_rs->cnt].name))
+   ELSE
+    RETURN(stack)
+   ENDIF
+ END ;Subroutine
+ IF ((validate(duar_seclogininfo->valid_username_ind,- (1))=- (1))
+  AND (validate(duar_seclogininfo->valid_username_ind,- (2))=- (2)))
+  FREE RECORD duar_seclogininfo
+  RECORD duar_seclogininfo(
+    1 valid_username_ind = i2
+    1 username = vc
+  )
+ ENDIF
+ DECLARE duar_validate_secuser(null) = i2
+ DECLARE duar_has_admin_privs(user_name=vc,has_privs=i2(ref)) = i2
+ SUBROUTINE duar_has_admin_privs(user_name,has_privs)
+   SET has_privs = 0
+   SET dm_err->eproc = "Determining if user has administrator privileges using dm_info."
+   SELECT INTO "nl:"
+    FROM dm_info di
+    WHERE "DM_INSTALL USER ADMINISTRATOR"=di.info_domain
+     AND di.info_name=user_name
+     AND 1=di.updt_id
+    WITH nocounter
+   ;end select
+   IF (check_error(dm_err->eproc)=1)
+    CALL disp_msg(dm_err->emsg,dm_err->logfile,1)
+    RETURN(0)
+   ENDIF
+   IF (curqual=0)
+    SET dm_err->eproc = concat("Millenium user ",user_name,
+     " is not authorized to execute this program.")
+    CALL disp_msg("",dm_err->logfile,0)
+   ELSE
+    SET has_privs = 1
+   ENDIF
+   RETURN(1)
+ END ;Subroutine
+ SUBROUTINE duar_validate_secuser(null)
+   DECLARE dvs_username_char = c50 WITH private, noconstant("")
+   SET duar_seclogininfo->username = ""
+   SET duar_seclogininfo->valid_username_ind = 0
+   IF (((validate(dm2_force_secuser,"A") != "A") OR (validate(dm2_force_secuser,"B") != "B")) )
+    SET duar_seclogininfo->valid_username_ind = 1
+    SET duar_seclogininfo->username = dm2_force_secuser
+    SET dm_err->eproc = "Override secuser is present, autosuccess."
+    CALL disp_msg("",dm_err->logfile,0)
+    RETURN(1)
+   ENDIF
+   SET dm_err->eproc = "Executing cclseclogin to request CCL Security login."
+   CALL disp_msg("",dm_err->logfile,0)
+   EXECUTE dm2_cclseclogin
+   IF ((dm_err->err_ind=1))
+    RETURN(0)
+   ENDIF
+   SET dm_err->eproc = "Retrieving CCL Security user name from uar_SecGetUserName."
+   SET stat = uar_secgetusername(dvs_username_char,size(dvs_username_char))
+   IF (check_error(dm_err->eproc)=1)
+    CALL disp_msg(dm_err->emsg,dm_err->logfile,1)
+    RETURN(0)
+   ENDIF
+   IF (stat > 0)
+    SET duar_seclogininfo->valid_username_ind = 1
+    SET duar_seclogininfo->username = trim(dvs_username_char,3)
+   ELSE
+    SET dm_err->err_ind = 1
+    RETURN(0)
+   ENDIF
+   RETURN(1)
+ END ;Subroutine
+ DECLARE dctx_set_context(dsc_i_attr_name=vc,dsc_i_value=vc) = i2
+ DECLARE dctx_restore_prev_contexts(null) = i2
+ IF ((validate(dm2_prev_ctxt->attr_cnt,- (1))=- (1))
+  AND (validate(dm2_prev_ctxt->attr_cnt,- (2))=- (2)))
+  RECORD dm2_prev_ctxt(
+    1 attr_cnt = i4
+    1 qual[*]
+      2 attr_name = vc
+      2 attr_value = vc
+  )
+  SET dm2_prev_ctxt->attr_cnt = 0
+ ENDIF
+ SUBROUTINE dctx_set_context(dsc_i_attr_name,dsc_i_value)
+   DECLARE dsc_attrib_idx = i4 WITH protect, noconstant(0)
+   DECLARE dsc_prev_err_ind = i2 WITH protect, noconstant(0)
+   SET dsc_prev_err_ind = dm_err->err_ind
+   SET dm_err->err_ind = 0
+   EXECUTE dm2_set_context value(dsc_i_attr_name), value(dsc_i_value)
+   IF ((dm_err->err_ind=1))
+    RETURN(0)
+   ELSE
+    SET dsc_attrib_idx = locateval(dsc_attrib_idx,1,dm2_prev_ctxt->attr_cnt,dsc_i_attr_name,
+     dm2_prev_ctxt->qual[dsc_attrib_idx].attr_name)
+    IF (dsc_attrib_idx=0)
+     SET dm2_prev_ctxt->attr_cnt = (dm2_prev_ctxt->attr_cnt+ 1)
+     SET stat = alterlist(dm2_prev_ctxt->qual,dm2_prev_ctxt->attr_cnt)
+     SET dm2_prev_ctxt->qual[dm2_prev_ctxt->attr_cnt].attr_name = dsc_i_attr_name
+     SET dm2_prev_ctxt->qual[dm2_prev_ctxt->attr_cnt].attr_value = dsc_i_value
+    ELSE
+     SET dm2_prev_ctxt->qual[dsc_attrib_idx].attr_value = dsc_i_value
+    ENDIF
+    IF (dsc_prev_err_ind=1)
+     SET dm_err->err_ind = 1
+    ENDIF
+    RETURN(1)
+   ENDIF
+ END ;Subroutine
+ SUBROUTINE dctx_restore_prev_contexts(null)
+   DECLARE drpc_cnt = i4 WITH protect, noconstant(0)
+   IF ((dm_err->debug_flag > 1))
+    CALL echorecord(dm2_prev_ctxt)
+   ENDIF
+   FOR (drpc_cnt = 1 TO dm2_prev_ctxt->attr_cnt)
+    EXECUTE dm2_set_context value(dm2_prev_ctxt->qual[drpc_cnt].attr_name), value(dm2_prev_ctxt->
+     qual[drpc_cnt].attr_value)
+    IF ((dm_err->err_ind=1))
+     RETURN(0)
+    ENDIF
+   ENDFOR
+   RETURN(1)
+ END ;Subroutine
+ IF ( NOT (validate(dsr,0)))
+  RECORD dsr(
+    1 qual[*]
+      2 stat_snap_dt_tm = dq8
+      2 snapshot_type = c100
+      2 client_mnemonic = c10
+      2 domain_name = c20
+      2 node_name = c30
+      2 qual[*]
+        3 stat_name = vc
+        3 stat_seq = i4
+        3 stat_str_val = vc
+        3 stat_type = i4
+        3 stat_number_val = f8
+        3 stat_date_val = dq8
+        3 stat_clob_val = vc
+  )
+ ENDIF
+ FREE RECORD prsnl_users
+ RECORD prsnl_users(
+   1 cnt = i4
+   1 qual[*]
+     2 person_id = f8
+     2 user_name = vc
+     2 desired_user_name = vc
+     2 current_user_name = vc
+     2 too_long = i2
+ )
+ FREE RECORD dm_info_users
+ RECORD dm_info_users(
+   1 cnt = i4
+   1 qual[*]
+     2 user_name = vc
+ )
+ DECLARE dsua_access_mode = vc WITH protect, noconstant("")
+ DECLARE dsua_secusername = vc WITH protect, noconstant("")
+ DECLARE dsua_has_admin_privs = i2 WITH protect, noconstant(0)
+ DECLARE dsua_iter = i4 WITH protect, noconstant(0)
+ DECLARE dsua_too_long_list = vc WITH protect, noconstant("")
+ DECLARE dsua_ldap_auth = i2 WITH protect, noconstant(0)
+ DECLARE dsua_set_downtime_indicator(access_mode=vc) = i2
+ DECLARE dsua_update_prsnl(access_mode=vc) = i2
+ DECLARE dsua_get_auth_users(access_mode=vc) = i2
+ DECLARE dsua_get_all_users(null) = i2
+ IF (check_logfile("dm2_set_user_access",".log","dm2_set_user_access LOGFILE")=0)
+  GO TO exit_script
+ ENDIF
+ SET dm_err->eproc = "Beginning dm2_set_user_access"
+ CALL disp_msg("",dm_err->logfile,0)
+ SET dm_err->eproc = "Validating input parameters."
+ SET dsua_access_mode = trim(cnvtupper( $1),3)
+ IF (check_error(dm_err->eproc)=1)
+  SET dm_err->emsg = "Parameter usage: dm2_set_user_access '<access_mode>'"
+  CALL disp_msg(dm_err->emsg,dm_err->logfile,1)
+  GO TO exit_script
+ ENDIF
+ SET dm_err->eproc = "Validating <access_mode> input parameter."
+ IF ( NOT (dsua_access_mode IN ("DOWNTIME", "TESTING", "UPTIME")))
+  SET dm_err->err_ind = 1
+  SET dm_err->emsg = "Valid values are 'DOWNTIME', 'TESTING', 'UPTIME'"
+  CALL disp_msg(dm_err->emsg,dm_err->logfile,1)
+  GO TO exit_script
+ ENDIF
+ SET dm_err->eproc = "Executing secrtl to set up security uars."
+ CALL disp_msg("",dm_err->logfile,0)
+ EXECUTE secrtl
+ CALL check_error(dm_err->eproc)
+ IF (duar_validate_secuser(null)=0)
+  GO TO exit_script
+ ENDIF
+ SET dsua_secusername = duar_seclogininfo->username
+ IF (duar_has_admin_privs(dsua_secusername,dsua_has_admin_privs)=0)
+  GO TO exit_script
+ ENDIF
+ IF (dsua_has_admin_privs=0)
+  SET dm_err->err_ind = 1
+  GO TO exit_script
+ ENDIF
+ SET dm_err->eproc = "Selecting app authorization row from dm_info."
+ SELECT INTO "nl:"
+  FROM dm_info di
+  WHERE "DM_INSTALL DOWNTIME"=di.info_domain
+   AND "APP AUTHORIZE ENFORCED"=di.info_name
+  WITH nocounter
+ ;end select
+ IF (check_error(dm_err->eproc)=1)
+  CALL disp_msg(dm_err->emsg,dm_err->logfile,1)
+  GO TO exit_script
+ ENDIF
+ IF (curqual=1)
+  SET dsua_ldap_auth = 1
+ ENDIF
+ SET dm_err->eproc = "Setting session context so RDDS and EA triggers won't fire"
+ CALL disp_msg("",dm_err->logfile,0)
+ SET trace = skipreconnect
+ IF (dctx_set_context("FIRE_EA_TRG","NO")=0)
+  GO TO exit_script
+ ENDIF
+ IF (dctx_set_context("FIRE_REFCHG_TRG","NO")=0)
+  GO TO exit_script
+ ENDIF
+ IF (dsua_set_downtime_indicator(dsua_access_mode)=0)
+  GO TO exit_script
+ ENDIF
+ IF (dsua_ldap_auth=0)
+  IF (dsua_get_auth_users(dsua_access_mode)=0)
+   GO TO exit_script
+  ENDIF
+  IF (dsua_get_all_users(null)=0)
+   GO TO exit_script
+  ENDIF
+  IF (dsua_update_prsnl(dsua_access_mode)=0)
+   GO TO exit_script
+  ENDIF
+ ELSEIF (dsua_access_mode="UPTIME")
+  IF (dsua_get_all_users(null)=0)
+   GO TO exit_script
+  ENDIF
+  IF (dsua_update_prsnl(dsua_access_mode)=0)
+   GO TO exit_script
+  ENDIF
+ ENDIF
+ SET stat = alterlist(dsr->qual,1)
+ SET stat = alterlist(dsr->qual[1].qual,1)
+ SET dsr->qual[1].stat_snap_dt_tm = cnvtdatetime(curdate,curtime3)
+ SET dsr->qual[1].snapshot_type = "DM_INSTALL_DOWNTIME_INDICATOR"
+ SET dsr->qual[1].qual[1].stat_name = dsua_access_mode
+ SET dsr->qual[1].qual[1].stat_str_val = dsua_secusername
+ SET dsr->qual[1].qual[1].stat_type = 3
+ SET dsr->qual[1].qual[1].stat_date_val = cnvtdatetime(curdate,curtime3)
+ IF (checkprg("DM_STAT_SNAPS_LOAD") != 0)
+  EXECUTE dm_stat_snaps_load
+  SET dm_err->ecode = error(dm_err->emsg,1)
+  SET dm_err->err_ind = 0
+ ENDIF
+ GO TO exit_script
+ SUBROUTINE dsua_update_prsnl(access_mode)
+   IF (access_mode="UPTIME")
+    FOR (dsua_iter = 1 TO prsnl_users->cnt)
+      SET prsnl_users->qual[dsua_iter].desired_user_name = prsnl_users->qual[dsua_iter].user_name
+    ENDFOR
+   ELSE
+    FOR (dsua_iter = 1 TO dm_info_users->cnt)
+      SET dm_err->eproc = "Replacing desired_user_name with user_name if it exits in dm_info_users"
+      SELECT INTO "nl:"
+       FROM (dummyt d  WITH seq = value(prsnl_users->cnt))
+       PLAN (d
+        WHERE cnvtupper(dm_info_users->qual[dsua_iter].user_name)=cnvtupper(prsnl_users->qual[d.seq].
+         user_name))
+       DETAIL
+        prsnl_users->qual[d.seq].desired_user_name = prsnl_users->qual[d.seq].user_name
+       WITH nocounter
+      ;end select
+      IF (check_error(dm_err->eproc)=1)
+       CALL disp_msg(dm_err->emsg,dm_err->logfile,1)
+       RETURN(0)
+      ENDIF
+    ENDFOR
+   ENDIF
+   IF ((dm_err->debug_flag > 1))
+    CALL echorecord(prsnl_users)
+   ENDIF
+   SET dm_err->eproc = "Updating prsnl rows to match authorization levels."
+   UPDATE  FROM prsnl p,
+     (dummyt d  WITH seq = value(prsnl_users->cnt))
+    SET p.username = prsnl_users->qual[d.seq].desired_user_name
+    PLAN (d
+     WHERE (prsnl_users->qual[d.seq].current_user_name != prsnl_users->qual[d.seq].desired_user_name)
+      AND (prsnl_users->qual[d.seq].too_long=0))
+     JOIN (p
+     WHERE (prsnl_users->qual[d.seq].person_id=p.person_id))
+    WITH nocounter, maxcommit = 1000
+   ;end update
+   IF (check_error(dm_err->eproc)=1)
+    SET dm_err->user_action = concat(
+     "Warning: Not all users were updated with the appropriate access.  ",
+     "Continuing without running this script to successful completion may allow inappropriate user access."
+     )
+    CALL disp_msg(dm_err->emsg,dm_err->logfile,1)
+    ROLLBACK
+    RETURN(0)
+   ENDIF
+   COMMIT
+   RETURN(1)
+ END ;Subroutine
+ SUBROUTINE dsua_get_all_users(null)
+   DECLARE dsua_temp_username = vc WITH protect, noconstant("")
+   SET dm_err->eproc = "Selecting all usernames from prsnl."
+   SELECT INTO "nl:"
+    FROM prsnl p
+    WHERE p.username IS NOT null
+    HEAD REPORT
+     prsnl_users->cnt = 0, stat = alterlist(prsnl_users->qual,prsnl_users->cnt)
+    DETAIL
+     dsua_temp_username = trim(p.username,3)
+     IF (dsua_temp_username > " ")
+      prsnl_users->cnt = (prsnl_users->cnt+ 1)
+      IF (mod(prsnl_users->cnt,50)=1)
+       stat = alterlist(prsnl_users->qual,(prsnl_users->cnt+ 49))
+      ENDIF
+      prsnl_users->qual[prsnl_users->cnt].person_id = p.person_id, prsnl_users->qual[prsnl_users->cnt
+      ].current_user_name = trim(p.username,3), prsnl_users->qual[prsnl_users->cnt].user_name =
+      replace(prsnl_users->qual[prsnl_users->cnt].current_user_name,"~DM","",2),
+      prsnl_users->qual[prsnl_users->cnt].desired_user_name = build(prsnl_users->qual[prsnl_users->
+       cnt].user_name,"~DM")
+      IF (size(prsnl_users->qual[prsnl_users->cnt].user_name) > 47)
+       prsnl_users->qual[prsnl_users->cnt].too_long = 1
+      ENDIF
+     ENDIF
+    FOOT REPORT
+     stat = alterlist(prsnl_users->qual,prsnl_users->cnt)
+    WITH nocounter
+   ;end select
+   IF (check_error(dm_err->eproc)=1)
+    CALL disp_msg(dm_err->emsg,dm_err->logfile,1)
+    RETURN(0)
+   ENDIF
+   IF ((dm_err->debug_flag > 1))
+    CALL echorecord(prsnl_users)
+   ENDIF
+   RETURN(1)
+ END ;Subroutine
+ SUBROUTINE dsua_get_auth_users(access_mode)
+   IF (access_mode != "UPTIME")
+    SET dm_err->eproc = "Selecting all authorized users from dm_info."
+    SELECT
+     IF (access_mode="DOWNTIME")
+      WHERE di.info_domain IN ("DM_INSTALL USER ADMINISTRATOR", "DM_INSTALL PHASE USER DOWNTIME")
+       AND 1=di.updt_id
+     ELSEIF (access_mode="TESTING")
+      WHERE di.info_domain IN ("DM_INSTALL USER ADMINISTRATOR", "DM_INSTALL PHASE USER DOWNTIME",
+      "DM_INSTALL PHASE USER TESTING")
+       AND 1=di.updt_id
+     ELSE
+     ENDIF
+     DISTINCT INTO "nl:"
+     FROM dm_info di
+     HEAD REPORT
+      dm_info_users->cnt = 0, stat = alterlist(dm_info_users->qual,dm_info_users->cnt)
+     DETAIL
+      dm_info_users->cnt = (dm_info_users->cnt+ 1)
+      IF (mod(dm_info_users->cnt,24)=1)
+       stat = alterlist(dm_info_users->qual,(dm_info_users->cnt+ 25))
+      ENDIF
+      dm_info_users->qual[dm_info_users->cnt].user_name = di.info_name
+     FOOT REPORT
+      stat = alterlist(dm_info_users->qual,dm_info_users->cnt)
+     WITH nocounter
+    ;end select
+    IF (check_error(dm_err->eproc)=1)
+     CALL disp_msg(dm_err->emsg,dm_err->logfile,1)
+     RETURN(0)
+    ENDIF
+   ENDIF
+   IF ((dm_err->debug_flag > 1))
+    CALL echorecord(dm_info_users)
+   ENDIF
+   RETURN(1)
+ END ;Subroutine
+ SUBROUTINE dsua_set_downtime_indicator(access_mode)
+   SET dm_err->eproc = "Deleting current downtime indicator from dm_info."
+   DELETE  FROM dm_info di
+    WHERE "DM_INSTALL DOWNTIME INDICATOR"=di.info_domain
+    WITH nocounter
+   ;end delete
+   IF (check_error(dm_err->eproc)=1)
+    CALL disp_msg(dm_err->emsg,dm_err->logfile,1)
+    ROLLBACK
+    RETURN(0)
+   ENDIF
+   SET dm_err->eproc = "Inserting downtime indicator into dm_info."
+   INSERT  FROM dm_info di
+    SET di.info_domain = "DM_INSTALL DOWNTIME INDICATOR", di.info_name = access_mode, di.info_char =
+     dsua_secusername
+    WITH nocounter
+   ;end insert
+   IF (check_error(dm_err->eproc)=1)
+    CALL disp_msg(dm_err->emsg,dm_err->logfile,1)
+    ROLLBACK
+    RETURN(0)
+   ENDIF
+   COMMIT
+   RETURN(1)
+ END ;Subroutine
+#exit_script
+ IF (currdbhandle > "")
+  IF ((dm_err->debug_flag < 1))
+   SET message = noinformation
+  ENDIF
+  SET dm_err->eproc = "Setting session context for RDDS and EA triggers back to default."
+  CALL disp_msg("",dm_err->logfile,0)
+  CALL dctx_set_context("FIRE_EA_TRG","YES")
+  CALL dctx_set_context("FIRE_REFCHG_TRG","YES")
+  SET message = information
+  IF ((dm_err->debug_flag > 1))
+   CALL echo("After turning triggers on...")
+   SELECT INTO noforms
+    namespace, attribute, val = substring(1,30,value)
+    FROM v$context
+    WITH nocounter
+   ;end select
+  ENDIF
+  CALL check_error(dm_err->eproc)
+ ENDIF
+ IF (dsua_access_mode != "UPTIME"
+  AND (dm_err->err_ind=0))
+  SET dm_err->eproc = "Displaying list of users whose username was too long."
+  SELECT INTO "nl:"
+   FROM (dummyt d  WITH seq = value(prsnl_users->cnt))
+   WHERE (prsnl_users->qual[d.seq].too_long=1)
+   HEAD REPORT
+    dsua_too_long_list =
+    "The following usernames were not updated with the appropriate access because the username was too long:"
+   DETAIL
+    dsua_too_long_list = concat(dsua_too_long_list,":",prsnl_users->qual[d.seq].user_name)
+   WITH nocounter
+  ;end select
+  IF (check_error(dm_err->eproc)=1)
+   CALL disp_msg(dm_err->emsg,dm_err->logfile,1)
+  ENDIF
+  IF (curqual > 0)
+   SET dm_err->eproc = dsua_too_long_list
+   CALL disp_msg("",dm_err->logfile,0)
+  ENDIF
+ ENDIF
+ IF ((dm_err->err_ind=0))
+  SET dm_err->eproc = "The requested action was performed successfully."
+  CALL disp_msg("",dm_err->logfile,0)
+ ENDIF
+ SET dm_err->eproc = "Ending dm2_set_user_access."
+ CALL final_disp_msg("dm2_set_user_access")
+END GO

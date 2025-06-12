@@ -1,0 +1,312 @@
+CREATE PROGRAM bed_aud_lab_orc_incmplt:dba
+ IF ( NOT (validate(request,0)))
+  RECORD request(
+    1 program_name = vc
+    1 skip_volume_check_ind = i2
+    1 output_filename = vc
+    1 paramlist[*]
+      2 param_type_mean = vc
+      2 pdate1 = dq8
+      2 pdate2 = dq8
+      2 vlist[*]
+        3 dbl_value = f8
+        3 string_value = vc
+  )
+ ENDIF
+ IF ( NOT (validate(reply,0)))
+  RECORD reply(
+    1 collist[*]
+      2 header_text = vc
+      2 data_type = i2
+      2 hide_ind = i2
+    1 rowlist[*]
+      2 celllist[*]
+        3 date_value = dq8
+        3 nbr_value = i4
+        3 double_value = f8
+        3 string_value = vc
+        3 display_flag = i2
+    1 high_volume_flag = i2
+    1 output_filename = vc
+    1 run_status_flag = i2
+    1 statlist[*]
+      2 statistic_meaning = vc
+      2 status_flag = i2
+      2 qualifying_items = i4
+      2 total_items = i4
+    1 status_data
+      2 status = c1
+      2 subeventstatus[1]
+        3 operationname = c15
+        3 operationstatus = c1
+        3 targetobjectname = c15
+        3 targetobjectvalue = c100
+  )
+ ENDIF
+ FREE RECORD temp
+ RECORD temp(
+   1 o_cnt = i4
+   1 olist[*]
+     2 catalog_cd = f8
+     2 primary_mnemonic = vc
+     2 catalog_type_cd = f8
+     2 catalog_type_disp = vc
+     2 activity_type_cd = f8
+     2 activity_type_disp = vc
+     2 activity_subtype_cd = f8
+     2 activity_subtype_disp = vc
+     2 no_dta_ind = i2
+     2 no_subact_ind = i2
+     2 no_routing_ind = i2
+     2 no_coll_req_ind = i2
+     2 resource_route_lvl = i2
+ )
+ DECLARE genlab = f8 WITH public, noconstant(0.0)
+ SELECT INTO "nl:"
+  FROM code_value cv
+  PLAN (cv
+   WHERE cv.code_set=6000
+    AND cv.cdf_meaning="GENERAL LAB"
+    AND cv.active_ind=1)
+  DETAIL
+   genlab = cv.code_value
+  WITH nocounter
+ ;end select
+ SET apat_cd = 0.0
+ SET glbat_cd = 0.0
+ SET apspecast_cd = 0.0
+ SELECT INTO "nl:"
+  FROM code_value cv
+  PLAN (cv
+   WHERE cv.code_set=106
+    AND cv.cdf_meaning="AP"
+    AND cv.active_ind=1)
+  DETAIL
+   apat_cd = cv.code_value
+  WITH nocounter
+ ;end select
+ SELECT INTO "nl:"
+  FROM code_value cv
+  PLAN (cv
+   WHERE cv.code_set=106
+    AND cv.cdf_meaning="GLB"
+    AND cv.active_ind=1)
+  DETAIL
+   glbat_cd = cv.code_value
+  WITH nocounter
+ ;end select
+ SELECT INTO "nl:"
+  FROM code_value cv
+  PLAN (cv
+   WHERE cv.code_set=5801
+    AND cv.cdf_meaning="APSPECIMEN"
+    AND cv.active_ind=1)
+  DETAIL
+   apspecast_cd = cv.code_value
+  WITH nocounter
+ ;end select
+ SET high_volume_cnt = 0
+ IF ((request->skip_volume_check_ind=0))
+  SELECT INTO "nl:"
+   hv_cnt = count(*)
+   FROM order_catalog oc
+   PLAN (oc
+    WHERE oc.catalog_type_cd=genlab
+     AND oc.active_ind=1)
+   DETAIL
+    high_volume_cnt = hv_cnt
+   WITH nocounter
+  ;end select
+  CALL echo(high_volume_cnt)
+  IF (high_volume_cnt > 5000)
+   SET reply->high_volume_flag = 2
+   GO TO exit_script
+  ELSEIF (high_volume_cnt > 3000)
+   SET reply->high_volume_flag = 1
+   GO TO exit_script
+  ENDIF
+ ENDIF
+ SET temp->o_cnt = 0
+ SELECT INTO "nl:"
+  FROM order_catalog o,
+   code_value cv1,
+   code_value cv2,
+   code_value cv3
+  PLAN (o
+   WHERE o.catalog_type_cd=genlab
+    AND o.active_ind=1)
+   JOIN (cv1
+   WHERE cv1.code_value=o.catalog_type_cd)
+   JOIN (cv2
+   WHERE cv2.code_value=o.activity_type_cd)
+   JOIN (cv3
+   WHERE cv3.code_value=o.activity_subtype_cd)
+  ORDER BY cv2.display_key, cnvtupper(o.primary_mnemonic)
+  HEAD REPORT
+   o_cnt = 0
+  DETAIL
+   o_cnt = (o_cnt+ 1), temp->o_cnt = o_cnt, stat = alterlist(temp->olist,o_cnt),
+   temp->olist[o_cnt].catalog_cd = o.catalog_cd, temp->olist[o_cnt].primary_mnemonic = o
+   .primary_mnemonic, temp->olist[o_cnt].catalog_type_cd = o.catalog_type_cd,
+   temp->olist[o_cnt].catalog_type_disp = cv1.display, temp->olist[o_cnt].activity_type_cd = o
+   .activity_type_cd, temp->olist[o_cnt].activity_type_disp = cv2.display,
+   temp->olist[o_cnt].no_subact_ind = 0, temp->olist[o_cnt].resource_route_lvl = o.resource_route_lvl
+   IF (o.activity_subtype_cd > 0)
+    temp->olist[o_cnt].activity_subtype_cd = o.activity_subtype_cd, temp->olist[o_cnt].
+    activity_subtype_disp = cv3.display
+   ELSE
+    IF (o.activity_type_cd IN (apat_cd, glbat_cd))
+     temp->olist[o_cnt].no_subact_ind = 1
+    ENDIF
+   ENDIF
+   temp->olist[o_cnt].no_dta_ind = 1, temp->olist[o_cnt].no_routing_ind = 1
+   IF (o.activity_type_cd=apat_cd
+    AND o.activity_subtype_cd != apspecast_cd)
+    temp->olist[o_cnt].no_coll_req_ind = 0
+   ELSE
+    temp->olist[o_cnt].no_coll_req_ind = 1
+   ENDIF
+   IF (((o.orderable_type_flag=2) OR (o.orderable_type_flag=6)) )
+    temp->olist[o_cnt].no_dta_ind = 0, temp->olist[o_cnt].no_routing_ind = 0, temp->olist[o_cnt].
+    no_coll_req_ind = 0
+   ENDIF
+   IF (o.bill_only_ind=1)
+    temp->olist[o_cnt].no_dta_ind = 0, temp->olist[o_cnt].no_routing_ind = 0, temp->olist[o_cnt].
+    no_coll_req_ind = 0
+   ENDIF
+  WITH nocounter
+ ;end select
+ SET stat = alterlist(reply->collist,8)
+ SET reply->collist[1].header_text = "Activity Type"
+ SET reply->collist[1].data_type = 1
+ SET reply->collist[1].hide_ind = 0
+ SET reply->collist[2].header_text = "Primary Name"
+ SET reply->collist[2].data_type = 1
+ SET reply->collist[2].hide_ind = 0
+ SET reply->collist[3].header_text = "No Act SubType"
+ SET reply->collist[3].data_type = 1
+ SET reply->collist[3].hide_ind = 0
+ SET reply->collist[4].header_text = "No Assays"
+ SET reply->collist[4].data_type = 1
+ SET reply->collist[4].hide_ind = 0
+ SET reply->collist[5].header_text = "No Routing"
+ SET reply->collist[5].data_type = 1
+ SET reply->collist[5].hide_ind = 0
+ SET reply->collist[6].header_text = "Incomplete Coll Req"
+ SET reply->collist[6].data_type = 1
+ SET reply->collist[6].hide_ind = 0
+ SET reply->collist[7].header_text = "Activity SubType"
+ SET reply->collist[7].data_type = 1
+ SET reply->collist[7].hide_ind = 0
+ SET reply->collist[8].header_text = "Catalog Cd"
+ SET reply->collist[8].data_type = 2
+ SET reply->collist[8].hide_ind = 1
+ IF ((temp->o_cnt=0))
+  GO TO exit_script
+ ENDIF
+ SELECT INTO "nl:"
+  FROM (dummyt d  WITH seq = temp->o_cnt),
+   profile_task_r ptr,
+   discrete_task_assay dta
+  PLAN (d)
+   JOIN (ptr
+   WHERE (ptr.catalog_cd=temp->olist[d.seq].catalog_cd)
+    AND ptr.active_ind=1)
+   JOIN (dta
+   WHERE dta.task_assay_cd=ptr.task_assay_cd
+    AND dta.active_ind=1)
+  DETAIL
+   temp->olist[d.seq].no_dta_ind = 0
+  WITH nocounter
+ ;end select
+ SELECT INTO "nl:"
+  FROM (dummyt d  WITH seq = temp->o_cnt),
+   orc_resource_list orl
+  PLAN (d
+   WHERE (temp->olist[d.seq].resource_route_lvl < 2))
+   JOIN (orl
+   WHERE (orl.catalog_cd=temp->olist[d.seq].catalog_cd)
+    AND orl.active_ind=1)
+  DETAIL
+   temp->olist[d.seq].no_routing_ind = 0
+  WITH nocounter
+ ;end select
+ SELECT INTO "nl:"
+  FROM (dummyt d  WITH seq = temp->o_cnt),
+   profile_task_r ptr,
+   assay_processing_r apr
+  PLAN (d
+   WHERE (temp->olist[d.seq].resource_route_lvl=2))
+   JOIN (ptr
+   WHERE (ptr.catalog_cd=temp->olist[d.seq].catalog_cd)
+    AND ptr.active_ind=1)
+   JOIN (apr
+   WHERE apr.task_assay_cd=ptr.task_assay_cd
+    AND apr.active_ind=1)
+  DETAIL
+   temp->olist[d.seq].no_routing_ind = 0
+  WITH nocounter
+ ;end select
+ SELECT INTO "nl:"
+  FROM (dummyt d  WITH seq = temp->o_cnt),
+   orc_resource_list orl,
+   collection_info_qualifiers ciq
+  PLAN (d
+   WHERE (temp->olist[d.seq].no_routing_ind=0))
+   JOIN (orl
+   WHERE (orl.catalog_cd=temp->olist[d.seq].catalog_cd)
+    AND orl.active_ind=1)
+   JOIN (ciq
+   WHERE ciq.catalog_cd=outerjoin(orl.catalog_cd)
+    AND ciq.service_resource_cd=outerjoin(orl.service_resource_cd))
+  ORDER BY d.seq, orl.catalog_cd, orl.service_resource_cd
+  HEAD orl.catalog_cd
+   all_match = 1
+  DETAIL
+   IF (((ciq.catalog_cd != orl.catalog_cd) OR (ciq.service_resource_cd != orl.service_resource_cd)) )
+    all_match = 0
+   ENDIF
+  FOOT  orl.catalog_cd
+   IF (all_match=1)
+    temp->olist[d.seq].no_coll_req_ind = 0
+   ENDIF
+  WITH nocounter
+ ;end select
+ SET row_nbr = 0
+ FOR (x = 1 TO temp->o_cnt)
+   SET row_nbr = (row_nbr+ 1)
+   SET stat = alterlist(reply->rowlist,row_nbr)
+   SET stat = alterlist(reply->rowlist[row_nbr].celllist,8)
+   SET reply->rowlist[row_nbr].celllist[1].string_value = temp->olist[x].activity_type_disp
+   SET reply->rowlist[row_nbr].celllist[7].string_value = temp->olist[x].activity_subtype_disp
+   SET reply->rowlist[row_nbr].celllist[2].string_value = temp->olist[x].primary_mnemonic
+   SET reply->rowlist[row_nbr].celllist[8].double_value = temp->olist[x].catalog_cd
+   IF ((temp->olist[x].no_subact_ind=1))
+    SET reply->rowlist[row_nbr].celllist[3].string_value = "X"
+   ELSE
+    SET reply->rowlist[row_nbr].celllist[3].string_value = " "
+   ENDIF
+   IF ((temp->olist[x].no_dta_ind=1))
+    SET reply->rowlist[row_nbr].celllist[4].string_value = "X"
+   ELSE
+    SET reply->rowlist[row_nbr].celllist[4].string_value = " "
+   ENDIF
+   IF ((temp->olist[x].no_routing_ind=1))
+    SET reply->rowlist[row_nbr].celllist[5].string_value = "X"
+   ELSE
+    SET reply->rowlist[row_nbr].celllist[5].string_value = " "
+   ENDIF
+   IF ((temp->olist[x].no_coll_req_ind=1))
+    SET reply->rowlist[row_nbr].celllist[6].string_value = "X"
+   ELSE
+    SET reply->rowlist[row_nbr].celllist[6].string_value = " "
+   ENDIF
+ ENDFOR
+#exit_script
+ IF ((reply->high_volume_flag IN (1, 2)))
+  SET reply->output_filename = build("lab_orc_incmplt_audit.csv")
+ ENDIF
+ IF ((request->output_filename > " "))
+  EXECUTE bed_rpt_file
+ ENDIF
+END GO

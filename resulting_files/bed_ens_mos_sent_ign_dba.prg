@@ -1,0 +1,48 @@
+CREATE PROGRAM bed_ens_mos_sent_ign:dba
+ FREE SET reply
+ RECORD reply(
+   1 error_msg = vc
+   1 status_data
+     2 status = c1
+     2 subeventstatus[1]
+       3 operationname = c25
+       3 operationstatus = c1
+       3 targetobjectname = c25
+       3 targetobjectvalue = vc
+ )
+ SET error_flag = "N"
+ SET reply->status_data.status = "F"
+ SET serrmsg = fillstring(132," ")
+ SET ierrcode = error(serrmsg,1)
+ SET cnt = size(request->sentences,5)
+ IF (cnt=0)
+  GO TO exit_script
+ ENDIF
+ SET ierrcode = 0
+ INSERT  FROM br_name_value b,
+   (dummyt d  WITH seq = value(cnt))
+  SET b.br_name_value_id = seq(bedrock_seq,nextval), b.br_nv_key1 = "MEDORDSENTIGN", b.br_name =
+   request->sentences[d.seq].ext_identifier,
+   b.br_value = cnvtstring(request->sentences[d.seq].synonym_id), b.updt_dt_tm = cnvtdatetime(curdate,
+    curtime3), b.updt_id = reqinfo->updt_id,
+   b.updt_task = reqinfo->updt_task, b.updt_cnt = 0, b.updt_applctx = reqinfo->updt_applctx
+  PLAN (d)
+   JOIN (b)
+  WITH nocounter
+ ;end insert
+ SET ierrcode = error(serrmsg,1)
+ IF (ierrcode > 0)
+  SET error_flag = "Y"
+  SET reply->error_msg = serrmsg
+  GO TO exit_script
+ ENDIF
+#exit_script
+ IF (error_flag="N")
+  SET reply->status_data.status = "S"
+  SET reqinfo->commit_ind = 1
+ ELSE
+  SET reply->status_data.status = "F"
+  SET reqinfo->commit_ind = 0
+ ENDIF
+ CALL echorecord(reply)
+END GO

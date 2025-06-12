@@ -1,0 +1,80 @@
+CREATE PROGRAM edw_create_ap_case:dba
+ SELECT INTO value(ap_case_extractfile)
+  FROM (dummyt d  WITH seq = value(cur_list_size))
+  WHERE cur_list_size > 0
+  DETAIL
+   col 0,
+   CALL print(trim(health_system_id)), v_bar,
+   CALL print(trim(health_system_source_id)), v_bar,
+   CALL print(trim(cnvtstring(ap_case->qual[d.seq].ap_case_sk,16))),
+   v_bar,
+   CALL print(trim(ap_case->qual[d.seq].encounter_nk)), v_bar,
+   CALL print(trim(cnvtstring(ap_case->qual[d.seq].encounter_sk,16))), v_bar,
+   CALL print(trim(replace(ap_case->qual[d.seq].accession,str_find,str_replace,3))),
+   v_bar,
+   CALL print(trim(datetimezoneformat(evaluate(curutc,1,ap_case->qual[d.seq].accessioned_dt_tm,0,
+      cnvtdatetimeutc(ap_case->qual[d.seq].accessioned_dt_tm,3)),utc_timezone_index,
+     "MM/DD/YYYY HH:mm"))), v_bar,
+   CALL print(trim(cnvtstring(ap_case->qual[d.seq].accessioned_tm_zn))), v_bar,
+   CALL print(evaluate(datetimezoneformat(ap_case->qual[d.seq].accessioned_dt_tm,cnvtint(ap_case->
+      qual[d.seq].accessioned_tm_zn),"HHmmsscc"),"00000000","0","        ","0",
+    "1")),
+   v_bar,
+   CALL print(trim(cnvtstring(ap_case->qual[d.seq].accession_prsnl,16))), v_bar,
+   CALL print(trim(datetimezoneformat(evaluate(curutc,1,ap_case->qual[d.seq].case_received_dt_tm,0,
+      cnvtdatetimeutc(ap_case->qual[d.seq].case_received_dt_tm,3)),utc_timezone_index,
+     "MM/DD/YYYY HH:mm"))), v_bar,
+   CALL print(trim(cnvtstring(ap_case->qual[d.seq].case_received_tm_zn))),
+   v_bar,
+   CALL print(evaluate(datetimezoneformat(ap_case->qual[d.seq].case_received_dt_tm,cnvtint(ap_case->
+      qual[d.seq].case_received_tm_zn),"HHmmsscc"),"00000000","0","        ","0",
+    "1")), v_bar,
+   CALL print(trim(cnvtstring(ap_case->qual[d.seq].case_type_ref,16))), v_bar,
+   CALL print(trim(cnvtstring(ap_case->qual[d.seq].clinical_high_risk_flg,16))),
+   v_bar,
+   CALL print(trim(cnvtstring(ap_case->qual[d.seq].comment_long_text_sk,16))), v_bar,
+   CALL print(trim(cnvtstring(ap_case->qual[d.seq].order_loc,16))), v_bar,
+   CALL print(trim(datetimezoneformat(evaluate(curutc,1,ap_case->qual[d.seq].case_collected_dt_tm,0,
+      cnvtdatetimeutc(ap_case->qual[d.seq].case_collected_dt_tm,3)),utc_timezone_index,
+     "MM/DD/YYYY HH:mm"))),
+   v_bar,
+   CALL print(trim(cnvtstring(ap_case->qual[d.seq].case_collected_tm_zn))), v_bar,
+   CALL print(evaluate(datetimezoneformat(ap_case->qual[d.seq].case_collected_dt_tm,cnvtint(ap_case->
+      qual[d.seq].case_collected_tm_zn),"HHmmsscc"),"00000000","0","        ","0",
+    "1")), v_bar,
+   CALL print(trim(datetimezoneformat(evaluate(curutc,1,ap_case->qual[d.seq].main_rpt_verf_dt_tm,0,
+      cnvtdatetimeutc(ap_case->qual[d.seq].main_rpt_verf_dt_tm,3)),utc_timezone_index,
+     "MM/DD/YYYY HH:mm"))),
+   v_bar,
+   CALL print(trim(cnvtstring(ap_case->qual[d.seq].main_rpt_verf_tm_zn))), v_bar,
+   CALL print(evaluate(datetimezoneformat(ap_case->qual[d.seq].main_rpt_verf_dt_tm,cnvtint(ap_case->
+      qual[d.seq].main_rpt_verf_tm_zn),"HHmmsscc"),"00000000","0","        ","0",
+    "1")), v_bar,
+   CALL print(trim(ap_case->qual[d.seq].origin_flg)),
+   v_bar,
+   CALL print(trim(cnvtstring(ap_case->qual[d.seq].ext_smear_received_flg,16))), v_bar,
+   CALL print(trim(cnvtstring(ap_case->qual[d.seq].order_prsnl,16))), v_bar,
+   CALL print(trim(ap_case->qual[d.seq].reserved_flg)),
+   v_bar,
+   CALL print(trim(cnvtstring(ap_case->qual[d.seq].resp_prsnl,16))), v_bar,
+   CALL print(trim(cnvtstring(ap_case->qual[d.seq].resp_resident_prsnl,16))), v_bar,
+   CALL print(trim(cnvtstring(ap_case->qual[d.seq].source_of_smear_ref,16))),
+   v_bar,
+   CALL print(trim(cnvtstring(ap_case->qual[d.seq].cancel_ref,16))), v_bar,
+   CALL print(trim(datetimezoneformat(evaluate(curutc,1,ap_case->qual[d.seq].cancel_dt_tm,0,
+      cnvtdatetimeutc(ap_case->qual[d.seq].cancel_dt_tm,3)),utc_timezone_index,"MM/DD/YYYY HH:mm"))),
+   v_bar,
+   CALL print(trim(cnvtstring(ap_case->qual[d.seq].cancel_tm_zn))),
+   v_bar,
+   CALL print(evaluate(datetimezoneformat(ap_case->qual[d.seq].cancel_dt_tm,cnvtint(ap_case->qual[d
+      .seq].cancel_tm_zn),"HHmmsscc"),"00000000","0","        ","0",
+    "1")), v_bar,
+   CALL print(trim(cnvtstring(ap_case->qual[d.seq].cancel_prsnl,16))), v_bar, v_bar,
+   CALL print(trim(cnvtstring(ap_case->qual[d.seq].normalcy_ref,16))), v_bar, "3",
+   v_bar, extract_dt_tm_fmt, v_bar,
+   "1", v_bar, row + 1
+  WITH noheading, nocounter, format = lfstream,
+   maxcol = 1999, maxrow = 1, append
+ ;end select
+ SET script_version = "000 02/22/07 MG010594"
+END GO

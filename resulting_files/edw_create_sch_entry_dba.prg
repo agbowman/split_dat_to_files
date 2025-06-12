@@ -1,0 +1,77 @@
+CREATE PROGRAM edw_create_sch_entry:dba
+ SELECT INTO value(schentry_extractfile)
+  FROM (dummyt d  WITH seq = value(cur_list_size))
+  WHERE cur_list_size > 0
+  DETAIL
+   col 0,
+   CALL print(trim(health_system_id)), v_bar,
+   CALL print(trim(health_system_source_id)), v_bar,
+   CALL print(trim(cnvtstring(edw_sch_entry->qual[d.seq].sch_entry_sk,16))),
+   v_bar,
+   CALL print(trim(cnvtstring(edw_sch_entry->qual[d.seq].sch_appointment_sk,16))), v_bar,
+   CALL print(trim(cnvtstring(edw_sch_entry->qual[d.seq].schedule_sk,16))), v_bar,
+   CALL print(trim(cnvtstring(edw_sch_entry->qual[d.seq].sch_appt_action_sk,16))),
+   v_bar,
+   CALL print(trim(cnvtstring(edw_sch_entry->qual[d.seq].sch_calendar_sk,16))), v_bar,
+   CALL print(trim(cnvtstring(edw_sch_entry->qual[d.seq].encounter_sk,16))), v_bar,
+   CALL print(trim(edw_sch_entry->qual[d.seq].encounter_nk)),
+   v_bar,
+   CALL print(trim(cnvtstring(edw_sch_entry->qual[d.seq].appt_type_ref,16))), v_bar,
+   CALL print(trim(datetimezoneformat(evaluate(curutc,1,edw_sch_entry->qual[d.seq].earliest_dt_tm,0,
+      cnvtdatetimeutc(edw_sch_entry->qual[d.seq].earliest_dt_tm,3)),utc_timezone_index,
+     "MM/DD/YYYY HH:mm"))), v_bar,
+   CALL print(evaluate(datetimezoneformat(edw_sch_entry->qual[d.seq].earliest_dt_tm,cnvtint(
+      edw_sch_entry->qual[d.seq].earliest_tm_zn),"MMddyyyyHHmmss"),"00000000000000","0",
+    "              ","0",
+    "1")),
+   v_bar,
+   CALL print(trim(cnvtstring(edw_sch_entry->qual[d.seq].earliest_tm_zn,16))), v_bar,
+   CALL print(trim(cnvtstring(edw_sch_entry->qual[d.seq].entry_state_ref,16))), v_bar,
+   CALL print(trim(cnvtstring(edw_sch_entry->qual[d.seq].entry_type_ref,16))),
+   v_bar,
+   CALL print(trim(datetimezoneformat(evaluate(curutc,1,edw_sch_entry->qual[d.seq].latest_dt_tm,0,
+      cnvtdatetimeutc(edw_sch_entry->qual[d.seq].latest_dt_tm,3)),utc_timezone_index,
+     "MM/DD/YYYY HH:mm"))), v_bar,
+   CALL print(evaluate(datetimezoneformat(edw_sch_entry->qual[d.seq].latest_dt_tm,cnvtint(
+      edw_sch_entry->qual[d.seq].latest_tm_zn),"MMddyyyyHHmmss"),"00000000000000","0",
+    "              ","0",
+    "1")), v_bar,
+   CALL print(trim(cnvtstring(edw_sch_entry->qual[d.seq].latest_tm_zn,16))),
+   v_bar,
+   CALL print(trim(cnvtstring(edw_sch_entry->qual[d.seq].person_sk,16))), v_bar,
+   CALL print(trim(replace(edw_sch_entry->qual[d.seq].queue_mnemonic,str_find,str_replace,3))), v_bar,
+   CALL print(trim(replace(edw_sch_entry->qual[d.seq].queue_desc,str_find,str_replace,3))),
+   v_bar,
+   CALL print(trim(datetimezoneformat(evaluate(curutc,1,edw_sch_entry->qual[d.seq].request_made_dt_tm,
+      0,cnvtdatetimeutc(edw_sch_entry->qual[d.seq].request_made_dt_tm,3)),utc_timezone_index,
+     "MM/DD/YYYY HH:mm"))), v_bar,
+   CALL print(evaluate(datetimezoneformat(edw_sch_entry->qual[d.seq].request_made_dt_tm,cnvtint(
+      edw_sch_entry->qual[d.seq].request_tm_zn),"MMddyyyyHHmmss"),"00000000000000","0",
+    "              ","0",
+    "1")), v_bar,
+   CALL print(trim(cnvtstring(edw_sch_entry->qual[d.seq].request_tm_zn,16))),
+   v_bar,
+   CALL print(trim(cnvtstring(edw_sch_entry->qual[d.seq].req_action_ref,16))), v_bar,
+   CALL print(trim(cnvtstring(edw_sch_entry->qual[d.seq].standby_priority_ref,16))), v_bar,
+   CALL print(trim(datetimezoneformat(evaluate(curutc,1,edw_sch_entry->qual[d.seq].version_dt_tm,0,
+      cnvtdatetimeutc(edw_sch_entry->qual[d.seq].version_dt_tm,3)),utc_timezone_index,
+     "MM/DD/YYYY HH:mm"))),
+   v_bar,
+   CALL print(evaluate(datetimezoneformat(edw_sch_entry->qual[d.seq].version_dt_tm,cnvtint(
+      edw_sch_entry->qual[d.seq].version_tm_zn),"MMddyyyyHHmmss"),"00000000000000","0",
+    "              ","0",
+    "1")), v_bar,
+   CALL print(trim(cnvtstring(edw_sch_entry->qual[d.seq].version_tm_zn,16))), v_bar,
+   CALL print(trim(edw_sch_entry->qual[d.seq].active_ind,16)),
+   v_bar, "3", v_bar,
+   extract_dt_tm_fmt, v_bar,
+   CALL print(trim(replace(edw_sch_entry->qual[d.seq].object_sub_meaning,str_find,str_replace,3))),
+   v_bar,
+   CALL print(trim(replace(edw_sch_entry->qual[d.seq].event_alias,str_find,str_replace,3))), v_bar,
+   row + 1
+  WITH check, noheading, nocounter,
+   format = lfstream, maxcol = 1999, maxrow = 1,
+   append
+ ;end select
+ SET script_version = "002 05/23/14 SB026554"
+END GO
