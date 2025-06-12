@@ -19,11 +19,28 @@ def select_dat_file():
         return None
     return file_path
 
-def split_dat_file_to_prg(input_file_path, output_dir="resulting_files"):
+def select_output_directory():
+    """Opens a dialog to select a directory for the output files."""
+    root = tk.Tk()
+    root.withdraw()
+    root.attributes('-topmost', True)
+    output_path = filedialog.askdirectory(
+        parent=root,
+        title="Select a folder for the 'resulting_files'"
+    )
+    root.attributes('-topmost', False)
+    if not output_path:
+        print("Folder selection was canceled.")
+        return None
+    return output_path
+
+def split_dat_file_to_prg(input_file_path, output_dir_base):
     """
     Reads a .dat file, splits it into blocks based on 'CREATE PROGRAM'/'DROP PROGRAM'
-    and 'END GO' markers, and saves each block as a separate .prg file.
+    and 'END GO' markers, and saves each block as a separate .prg file in a 'resulting_files' subdirectory.
     """
+    output_dir = os.path.join(output_dir_base, "resulting_files")
+
     if not os.path.exists(output_dir):
         os.makedirs(output_dir)
         print(f"Created directory: {output_dir}")
@@ -84,8 +101,11 @@ def main():
     """Main function to run the script."""
     input_file = select_dat_file()
     if input_file:
-        print(f"Processing file: {input_file}")
-        split_dat_file_to_prg(input_file)
+        output_dir_base = select_output_directory()
+        if output_dir_base:
+            print(f"Processing file: {input_file}")
+            print(f"Output will be saved in: {os.path.join(output_dir_base, 'resulting_files')}")
+            split_dat_file_to_prg(input_file, output_dir_base)
 
 if __name__ == "__main__":
     main()

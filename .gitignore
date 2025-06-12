@@ -1,0 +1,11 @@
+resulting_files/
+build/
+#also add the .spec file
+*.spec
+#ignore the .pyc files
+*.pyc
+#ignore the .pyo files
+*.pyo
+#ignore the .pyd files
+*.pyd
+#ignore the .pyw files
